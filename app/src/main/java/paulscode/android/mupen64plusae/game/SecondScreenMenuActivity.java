@@ -94,6 +94,8 @@ public class SecondScreenMenuActivity extends Activity
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         buildLayout();
+        android.widget.Toast.makeText(this, "2nd screen: menu opened here (screen " + actualDisplay + ")",
+                android.widget.Toast.LENGTH_SHORT).show();
         mHost.onMenuScreenReady(this);
     }
 

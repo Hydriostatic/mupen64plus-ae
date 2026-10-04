@@ -60,6 +60,11 @@ public class DualScreenDrawerLayout extends DrawerLayout
 {
     private static final String TAG = "DualScreenDrawer";
 
+    /** Show a short message at each step (for testing on new devices). */
+    private static final boolean DIAGNOSTICS = true;
+
+    private static final long LAUNCH_TIMEOUT_MS = 4000;
+
     /** Only explain a failure once per process, so it doesn't nag on every game launch. */
     private static boolean sFailureShown = false;
 
@@ -79,6 +84,14 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private boolean mMenuOpen = false;
     private boolean mBypassForwarding = false;
     private DisplayManager mDisplayManager;
+
+    /** Fires if the menu screen didn't come up after we asked Android to open it. */
+    private final Runnable mLaunchTimeout = () -> {
+        if (mLaunchPending && mMenuScreen == null && mSecondScreenActive) {
+            onMenuScreenFailed("Android didn't open the menu on screen " + mTargetDisplayId +
+                    " (no reply after " + (LAUNCH_TIMEOUT_MS / 1000) + "s)");
+        }
+    };
 
     private final DisplayManager.DisplayListener mDisplayListener = new DisplayManager.DisplayListener() {
         @Override
@@ -152,6 +165,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (activity == null) return;
 
         Display target = findSecondaryDisplay(activity);
+        status("found screens: " + describeDisplays(activity));
         if (target == null) {
             Log.i(TAG, "No usable secondary display. " + describeDisplays(activity));
             if (explainFailure) {
@@ -182,6 +196,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
         removeView(mDrawerView);
 
         Log.i(TAG, "Showing in-game menu on display " + target.getDisplayId() + " (" + target.getName() + ")");
+        status("opening menu on screen " + target.getDisplayId() + " (" + target.getName() + ")");
         mTargetDisplayId = target.getDisplayId();
         mSecondScreenActive = true;
         mMenuOpen = wasOpen;
@@ -234,6 +249,9 @@ public class DualScreenDrawerLayout extends DrawerLayout
         try {
             mLaunchPending = true;
             activity.startActivity(intent, options.toBundle());
+            // Android doesn't report a refused launch on another display, so check ourselves
+            mHandler.removeCallbacks(mLaunchTimeout);
+            mHandler.postDelayed(mLaunchTimeout, LAUNCH_TIMEOUT_MS);
         } catch (Exception e) {
             Log.w(TAG, "Couldn't open menu on display " + mTargetDisplayId, e);
             mLaunchPending = false;
@@ -244,6 +262,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private void finishMenuScreen()
     {
         mLaunchPending = false;
+        mHandler.removeCallbacks(mLaunchTimeout);
         if (mMenuScreen != null) {
             SecondScreenMenuActivity screen = mMenuScreen;
             mMenuScreen = null;
@@ -256,6 +275,8 @@ public class DualScreenDrawerLayout extends DrawerLayout
     void onMenuScreenReady(SecondScreenMenuActivity screen)
     {
         mLaunchPending = false;
+        mHandler.removeCallbacks(mLaunchTimeout);
+        status("menu screen is up");
 
         if (!mSecondScreenActive) {
             screen.finishFromHost();
@@ -277,6 +298,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (!expected && mSecondScreenActive) {
             // Closed by the system or the user from the other screen: go back to the side drawer
             Log.i(TAG, "Second screen menu was closed, using the side drawer");
+            status("menu screen was closed by the system, using side menu");
             leaveSecondScreenMode();
         }
     }
@@ -292,9 +314,17 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
     // Helpers -----------------------------------------------------------------------------------
 
+    /** Diagnostic messages while second-screen support is being tested on real hardware. */
+    private void status(String message)
+    {
+        Log.i(TAG, message);
+        if (!DIAGNOSTICS) return;
+        Toast.makeText(getContext(), "2nd screen: " + message, Toast.LENGTH_LONG).show();
+    }
+
     private void showFailure(String reason)
     {
-        if (sFailureShown) return;
+        if (sFailureShown && !DIAGNOSTICS) return;
         sFailureShown = true;
         Toast.makeText(getContext(), "Second screen menu not available: " + reason,
                 Toast.LENGTH_LONG).show();
