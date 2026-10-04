@@ -183,7 +183,7 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
     // Activity and views
     private GameOverlay mOverlay;
     private FpsOverlay mFpsOverlay;
-    private DrawerLayout mDrawerLayout;
+    private DualScreenDrawerLayout mDrawerLayout;
     private GameSidebar mGameSidebar;
     private GameSurface mGameSurface;
 
@@ -451,6 +451,9 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         }
 
         mDrawerLayout.setBackgroundColor(0xFF000000);
+
+        // On dual-screen devices (e.g. AYN Thor) show the in-game menu on the second screen
+        mDrawerLayout.setSecondScreenEnabled(mGlobalPrefs.inGameMenuOnSecondScreen);
 
         if (!TextUtils.isEmpty(mRomArtPath) && new File(mRomArtPath).exists() && FileUtil.isFileImage(new File(mRomArtPath)))
             mGameSidebar.setImage(new BitmapDrawable(this.getResources(), mRomArtPath));

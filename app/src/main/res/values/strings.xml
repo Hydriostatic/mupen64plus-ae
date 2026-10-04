@@ -675,6 +675,11 @@
     <string name="navigationMode_entryAuto">Auto-select from device configuration</string>
     <string name="navigationMode_entryStandard">Standard mode</string>
     <string name="navigationMode_entryBigScreen">Big-screen mode (no touchscreen; gamepad/keyboard input only)</string>
+    <string name="inGameMenuSecondScreen_title">Show in-game menu on second screen</string>
+    <string name="inGameMenuSecondScreen_summary">On dual-screen devices such as the AYN Thor, show the in-game menu on the second display instead of the side drawer</string>
+    <string name="secondScreenMenu_paused">Paused</string>
+    <string name="secondScreenMenu_resume">Resume game</string>
+    <string name="secondScreenMenu_tapToOpen">Tap to pause and open the menu</string>
     <string name="inGameMenuSetting_title">Show in-game menu</string>
     <string name="inGameMenuSetting_entryBackKey">When back key is pressed</string>
     <string name="inGameMenuSetting_entrySwipe">When slide gesture is used</string>

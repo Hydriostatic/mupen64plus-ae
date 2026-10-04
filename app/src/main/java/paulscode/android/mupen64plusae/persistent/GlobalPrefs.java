@@ -326,6 +326,9 @@ public class GlobalPrefs
     /** True if we are using the swipe gesture for the in-game menu, false if we are using the back key */
     public final boolean inGameMenuIsSwipGesture;
 
+    /** True if the in-game menu should be shown on a second display when one is present (e.g. AYN Thor) */
+    public final boolean inGameMenuOnSecondScreen;
+
     /** Maximum number of auto saves */
     public final int maxAutoSaves;
 
@@ -732,6 +735,7 @@ public class GlobalPrefs
         final boolean menuKeyMappable = mPreferences.getBoolean( "inputMenuMappable", false );
 
         inGameMenuIsSwipGesture = inGameMenuMode.equals("swipe") || menuKeyMappable || backKeyMappable;
+        inGameMenuOnSecondScreen = mPreferences.getBoolean( "inGameMenuSecondScreen", true );
 
         final List<Integer> unmappables = new ArrayList<>();
 
