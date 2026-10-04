@@ -147,6 +147,18 @@ public final class BanjoTooieStats
     };
     // highest flag byte used: 151
 
+    /**
+     * Worlds in flag order: Jiggies come 10 per world in this order (then the Isle o' Hags ones:
+     * King Jingaling + the 9 Jinjo families), notes come 16 nests + 1 Treble Clef per world.
+     */
+    static final String[] WORLDS = {
+            "Mayahem Temple", "Glitter Gulch Mine", "Witchyworld", "Jolly Roger's Lagoon",
+            "Terrydactyland", "Grunty Industries", "Hailfire Peaks", "Cloud Cuckooland",
+            "Isle o' Hags"
+    };
+    static final int WORLD_COUNT = 9;
+    static final int NESTS_PER_WORLD = 16;
+
 
     /** Is this ROM Banjo-Tooie (USA)? The addresses above are only valid for that version. */
     public static boolean isBanjoTooieUsa(String romHeaderName, byte countryCode)
@@ -164,6 +176,9 @@ public final class BanjoTooieStats
         public int health = -1, maxHealth = -1;
         public final int[] consumables = new int[CONSUMABLE_COUNT];
         public int jiggies, notes, jinjos, cheatoPages, emptyHoneycombs, glowbos, doubloons;
+        /** Per world, in {@link #WORLDS} order. */
+        public final int[] worldJiggies = new int[WORLD_COUNT];
+        public final int[] worldNotes = new int[WORLD_COUNT];
         /** Health of every character, indexed by character id (-1 = no entry). */
         public final int[] allHealth = new int[CHARACTER_SLOTS];
         public final int[] allMaxHealth = new int[CHARACTER_SLOTS];
@@ -218,8 +233,14 @@ public final class BanjoTooieStats
 
     private int countFlags(int[] flags)
     {
+        return countFlags(flags, 0, flags.length);
+    }
+
+    private int countFlags(int[] flags, int from, int count)
+    {
         int n = 0;
-        for (int f : flags) {
+        for (int i = from; i < from + count && i < flags.length; i++) {
+            int f = flags[i];
             int byteIndex = f >> 3;
             if (byteIndex < mFlags.length && (mFlags[byteIndex] & (1 << (f & 7))) != 0) n++;
         }
@@ -270,6 +291,14 @@ public final class BanjoTooieStats
                     s.emptyHoneycombs = countFlags(EMPTY_HONEYCOMB_FLAGS);
                     s.glowbos = countFlags(GLOWBO_FLAGS);
                     s.doubloons = countFlags(DOUBLOON_FLAGS);
+                    for (int w = 0; w < WORLD_COUNT; w++) {
+                        s.worldJiggies[w] = w < 8
+                                ? countFlags(JIGGY_FLAGS, w * 10, 10)
+                                : countFlags(JIGGY_FLAGS, 80, JIGGY_FLAGS.length - 80)
+                                        + countFlags(JINJO_FAMILY_JIGGY_FLAGS);
+                        s.worldNotes[w] = countFlags(NOTE_NEST_FLAGS, w * NESTS_PER_WORLD, NESTS_PER_WORLD) * 5
+                                + countFlags(TREBLE_CLEF_FLAGS, w, 1) * 20;
+                    }
                     s.valid = true;
                 }
             }

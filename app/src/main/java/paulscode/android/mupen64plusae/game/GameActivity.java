@@ -458,7 +458,7 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         // Banjo-Tooie (USA): live stats (health, collectibles, ammo) on the second screen
         if (mDrawerLayout.isUsingSecondScreen() &&
                 BanjoTooieStats.isBanjoTooieUsa(mRomHeaderName, mRomCountryCode)) {
-            mDrawerLayout.setInfoPanel(new BanjoTooieStatsView(this));
+            mDrawerLayout.setInfoPanel(new BanjoTooieStatsView(this, mDrawerLayout::toggleControllerTarget));
         }
 
         if (!TextUtils.isEmpty(mRomArtPath) && new File(mRomArtPath).exists() && FileUtil.isFileImage(new File(mRomArtPath)))
