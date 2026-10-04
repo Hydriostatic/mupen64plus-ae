@@ -1046,11 +1046,38 @@
 
     <!-- Jet Force Gemini (USA) twin-stick camera -->
     <string name="jfgCamera_category">Jet Force Gemini (USA)</string>
-    <string name="jfgTwinStickCamera_title">Twin-stick camera</string>
-    <string name="jfgTwinStickCamera_summary">During gameplay: left stick moves, right stick turns the camera, L2 aims, R2 fires, A jumps, B crouches, X/Y change weapon, L1/R1 sidestep. Done in the emulator; the ROM is not patched.</string>
-    <string name="jfgCameraSpeed_title">Right stick camera speed</string>
-    <string name="jfgCameraInvertY_title">Invert camera up/down</string>
-    <string name="jfgCameraInvertY_summary">Push the right stick up to raise the camera</string>
     <string name="jfgCamera_active">Jet Force Gemini: right stick controls the camera</string>
+    <string name="jfgCameraSettings_summary">Camera speed, invert, dead zones, buttons. While playing, the same page is on the second screen and changes apply at once.</string>
+    <string name="jfgPanel_title">Jet Force Gemini camera</string>
+    <string name="jfgPanel_reset">Reset to defaults</string>
+    <string name="jfgPanel_note">Left stick moves, right stick turns the camera, L2 aims, R2 fires, A jumps, B crouches, X/Y change weapon, L1/R1 sidestep. Done in the emulator; the ROM is not patched.</string>
+    <string name="jfgPanel_statusActive">Camera active</string>
+    <string name="jfgPanel_statusWaiting">Waiting for gameplay (menus, pause and cutscenes use your normal controls)</string>
+    <string name="jfgPanel_statusOff">Camera off: the game uses your normal controls</string>
+    <string name="jfgPanel_statusSettings">Applies the next time the game starts</string>
+    <string name="jfgParam_enabled">Right stick camera</string>
+    <string name="jfgParam_enabled_summary">Turn off to play with the original controls</string>
+    <string name="jfgParam_speedX">Horizontal speed</string>
+    <string name="jfgParam_speedY">Vertical speed</string>
+    <string name="jfgParam_invertX">Invert left/right</string>
+    <string name="jfgParam_invertY">Invert up/down</string>
+    <string name="jfgParam_invertY_summary">Off: push down to raise the camera and look down</string>
+    <string name="jfgParam_curve">Stick response</string>
+    <string name="jfgParam_curve_summary">1 = linear, 2 = finer near the centre, 3 = finest</string>
+    <string name="jfgParam_deadzoneRight">Right stick dead zone</string>
+    <string name="jfgParam_deadzoneLeft">Left stick dead zone</string>
+    <string name="jfgParam_trigger">Trigger press point</string>
+    <string name="jfgParam_trigger_summary">How far L2/R2 must go in to aim/fire</string>
+    <string name="jfgParam_heightLimit">Camera height range</string>
+    <string name="jfgParam_heightLimit_summary">How far the right stick can raise or lower the camera</string>
+    <string name="jfgParam_alignOnAim">Aim where the camera looks</string>
+    <string name="jfgParam_alignOnAim_summary">Off: aiming swings the camera behind the character instead</string>
+    <string name="jfgParam_freeInJump">Free camera while jumping</string>
+    <string name="jfgParam_keepGameCameras">Keep the game\'s special cameras</string>
+    <string name="jfgParam_keepGameCameras_summary">Off: the right stick also turns the camera where the game normally fixes it (may look odd)</string>
+    <string name="jfgParam_swapAB">Swap jump and crouch (A/B)</string>
+    <string name="jfgParam_swapXY">Swap weapon buttons (X/Y)</string>
+    <string name="jfgParam_aimSpeed">Reticle speed</string>
+    <string name="jfgParam_aimSpeed_summary">How fast the right stick moves the aiming reticle</string>
 
 </resources>

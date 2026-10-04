@@ -50,7 +50,7 @@ public interface AeBridgeLibrary extends Library {
     int aeReadRdram(int address, byte[] out, int length);
 
     // Jet Force Gemini (USA) twin-stick camera, see mupen64plus-core main/jfg_camera.c
-    void aeJfgConfigure(int enabled, int speed, int invertY);
+    void aeJfgSetParam(int id, float value);
     void aeJfgSetPad(int buttons, float lx, float ly, float rx, float ry, float lt, float rt);
     int aeJfgStatus();
 

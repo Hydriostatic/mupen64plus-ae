@@ -120,13 +120,10 @@
 
 /* Tuning, as Project64JFG ships it */
 #define STICK_LIMIT               80
-#define STICK_DEAD_ZONE           0.2f
 #define DIGITAL_THRESHOLD         0.5f
-#define TRIGGER_THRESHOLD         0.25f
 #define COUNTS_PER_SPEED          2.0f
 #define CAMERA_YAW_SENSITIVITY    64
 #define CAMERA_HEIGHT_SENSITIVITY 1.5f
-#define CAMERA_HEIGHT_LIMIT       200.0f
 #define ELEVATION_MIN_TANGENT     0.087488664f
 #define ELEVATION_MAX_TANGENT     1.732050808f
 #define N64_ANGLE_TO_RADIANS      0.000095873799f
@@ -243,15 +240,61 @@ static const struct jfg_patch g_orbit_patches[] =
 
 #define COUNT_OF(a) (sizeof(a) / sizeof((a)[0]))
 
+/* Every tunable: set by the frontend, read on the emulation thread */
+static volatile float    g_param[JFG_PARAM_COUNT];
+static volatile int      g_params_initialized = 0;
+
+/* Every tunable, with its default and the range it is clamped to */
+static const struct
+{
+    float def, min, max;
+} g_param_info[JFG_PARAM_COUNT] =
+{
+    /* JFG_PARAM_ENABLED         */ { 1.0f,   0.0f,   1.0f },
+    /* JFG_PARAM_SPEED_X         */ { 5.0f,   1.0f,  20.0f },
+    /* JFG_PARAM_SPEED_Y         */ { 5.0f,   1.0f,  20.0f },
+    /* JFG_PARAM_INVERT_X        */ { 0.0f,   0.0f,   1.0f },
+    /* JFG_PARAM_INVERT_Y        */ { 0.0f,   0.0f,   1.0f },
+    /* JFG_PARAM_CURVE           */ { 2.0f,   1.0f,   3.0f },
+    /* JFG_PARAM_DEADZONE_RIGHT  */ { 0.20f,  0.0f,   0.6f },
+    /* JFG_PARAM_DEADZONE_LEFT   */ { 0.20f,  0.0f,   0.6f },
+    /* JFG_PARAM_TRIGGER         */ { 0.25f,  0.05f,  0.95f },
+    /* JFG_PARAM_HEIGHT_LIMIT    */ { 200.0f, 0.0f, 400.0f },
+    /* JFG_PARAM_ALIGN_ON_AIM    */ { 1.0f,   0.0f,   1.0f },
+    /* JFG_PARAM_FREE_IN_JUMP    */ { 1.0f,   0.0f,   1.0f },
+    /* JFG_PARAM_KEEP_GAME_CAMS  */ { 1.0f,   0.0f,   1.0f },
+    /* JFG_PARAM_SWAP_AB         */ { 0.0f,   0.0f,   1.0f },
+    /* JFG_PARAM_SWAP_XY         */ { 0.0f,   0.0f,   1.0f },
+    /* JFG_PARAM_AIM_SPEED       */ { 1.0f,   0.25f,  3.0f },
+};
+
+static void init_params(void)
+{
+    int i;
+    if (g_params_initialized)
+        return;
+    for (i = 0; i < JFG_PARAM_COUNT; i++)
+        g_param[i] = g_param_info[i].def;
+    g_params_initialized = 1;
+}
+
+static float param(int id)
+{
+    init_params();
+    return g_param[id];
+}
+
+static int param_on(int id)
+{
+    return param(id) >= 0.5f;
+}
+
 /* ------------------------------------------------------------------------ */
 /* State                                                                     */
 /* ------------------------------------------------------------------------ */
 
 /* Written by the frontend's input thread, read on the emulation thread. A torn
  * read only mixes two consecutive samples, which is harmless here. */
-static volatile int      g_cfg_enabled = 1;
-static volatile int      g_cfg_speed = 5;
-static volatile int      g_cfg_invert_y = 0;
 static volatile int      g_pad_seen = 0;
 static volatile uint32_t g_pad_buttons = 0;
 static volatile float    g_pad_lx, g_pad_ly, g_pad_rx, g_pad_ry, g_pad_lt, g_pad_rt;
@@ -636,8 +679,9 @@ static int get_normal_camera_state(uint32_t player_data, int* normal_camera, int
 
 static float clamp_height(float value)
 {
-    if (value > CAMERA_HEIGHT_LIMIT) return CAMERA_HEIGHT_LIMIT;
-    if (value < -CAMERA_HEIGHT_LIMIT) return -CAMERA_HEIGHT_LIMIT;
+    const float limit = param(JFG_PARAM_HEIGHT_LIMIT);
+    if (value > limit) return limit;
+    if (value < -limit) return -limit;
     return value;
 }
 
@@ -733,17 +777,18 @@ static void evaluate_orbit(int aim, struct jfg_eval* e)
         get_player_camera(0, &e->camera) &&
         rd_u32(DISABLE_JOY_ADDR, &e->joy_disabled) &&
         rd_u8(e->player_data + PLAYER_CAMERA_MODE_OFFSET, &e->camera_mode);
-    /* Free camera in the jump camera too (Project64JFG's default) */
     e->jump_camera_mode = e->basic_state_available && e->camera_mode == CAMERA_MODE_JUMP;
-    e->free_jump_camera_allowed = e->jump_camera_mode;
-    e->free_camera_blocked_by_jump = 0;
+    e->free_jump_camera_allowed = e->jump_camera_mode && param_on(JFG_PARAM_FREE_IN_JUMP);
+    e->free_camera_blocked_by_jump = e->jump_camera_mode && !param_on(JFG_PARAM_FREE_IN_JUMP);
     e->constrained_state_available =
         e->basic_state_available &&
         get_normal_camera_state(e->player_data, &e->normal_camera, &e->mouse_camera_allowed);
-    /* Keep the game's own camera wherever it is not the plain follow camera */
+    /* Optionally keep the game's own camera wherever it is not the plain follow camera */
     e->free_camera_state_allowed =
-        e->joy_disabled == 0 &&
-        (e->free_jump_camera_allowed || (e->constrained_state_available && e->normal_camera));
+        e->joy_disabled == 0 && !e->free_camera_blocked_by_jump &&
+        (e->free_jump_camera_allowed ||
+         (param_on(JFG_PARAM_KEEP_GAME_CAMS) ? (e->constrained_state_available && e->normal_camera)
+                                             : e->basic_state_available));
     e->enable_free_orbit = e->free_camera_state_allowed && !aim;
 }
 
@@ -768,7 +813,8 @@ static void apply_orbit(const struct jfg_eval* e, int32_t dx, int32_t dy, int ai
             g_orbit.orbit_yaw = 0;
         }
 
-        if (!e->free_jump_camera_allowed &&
+        const int keep = param_on(JFG_PARAM_KEEP_GAME_CAMS);
+        if (keep && !e->free_jump_camera_allowed &&
             (!e->constrained_state_available || e->joy_disabled != 0 || !e->mouse_camera_allowed))
         {
             g_orbit.override_active = 0;
@@ -776,12 +822,12 @@ static void apply_orbit(const struct jfg_eval* e, int32_t dx, int32_t dy, int ai
             g_orbit.orbit_yaw_initialized = 0;
             g_orbit.elevation_ready = 0;
         }
-        else if (aim || e->joy_disabled != 0 ||
-                 (!e->free_jump_camera_allowed && e->camera_mode != CAMERA_MODE_NORMAL))
+        else if (aim || e->joy_disabled != 0 || e->free_camera_blocked_by_jump ||
+                 (keep && !e->free_jump_camera_allowed && e->camera_mode != CAMERA_MODE_NORMAL))
         {
             if (g_orbit.override_active)
             {
-                if (aim)
+                if (aim && param_on(JFG_PARAM_ALIGN_ON_AIM))
                     align_player_to_orbit(e->player_object, e->player_data);
                 wr_s16(e->camera + CAMERA_PITCH_OFFSET, 0);
                 wr_s16(e->player_data + PLAYER_CAMERA_YAW_OFFSET, 0);
@@ -837,17 +883,17 @@ static void apply_orbit(const struct jfg_eval* e, int32_t dx, int32_t dy, int ai
 /* Pad                                                                       */
 /* ------------------------------------------------------------------------ */
 
-static void normalise_stick(float x, float y, float* ox, float* oy)
+static void normalise_stick(float x, float y, float dead_zone, float* ox, float* oy)
 {
     float magnitude = sqrtf(x * x + y * y);
     float scale;
-    if (magnitude <= STICK_DEAD_ZONE)
+    if (magnitude <= dead_zone || magnitude <= 0.0f)
     {
         *ox = 0.0f;
         *oy = 0.0f;
         return;
     }
-    scale = (magnitude - STICK_DEAD_ZONE) / (1.0f - STICK_DEAD_ZONE);
+    scale = dead_zone < 1.0f ? (magnitude - dead_zone) / (1.0f - dead_zone) : 0.0f;
     if (scale > 1.0f) scale = 1.0f;
     *ox = x * scale / magnitude;
     *oy = y * scale / magnitude;
@@ -859,13 +905,28 @@ static int8_t stick_to_n64(float deflection)
     return (int8_t)(value >= 0.0f ? (int32_t)(value + 0.5f) : -(int32_t)(-value + 0.5f));
 }
 
+/* The reticle follows the N64 stick, so its speed is the deflection, scaled */
+static int8_t aim_axis(float deflection)
+{
+    float v = deflection * param(JFG_PARAM_AIM_SPEED);
+    if (v > 1.0f) v = 1.0f;
+    if (v < -1.0f) v = -1.0f;
+    return stick_to_n64(v);
+}
+
 static void read_pad(struct jfg_pad* pad)
 {
-    pad->buttons = g_pad_buttons;
-    normalise_stick(g_pad_lx, g_pad_ly, &pad->lx, &pad->ly);
-    normalise_stick(g_pad_rx, g_pad_ry, &pad->rx, &pad->ry);
-    pad->aim = (pad->buttons & JFG_PAD_L2) != 0 || g_pad_lt >= TRIGGER_THRESHOLD;
-    pad->fire = (pad->buttons & JFG_PAD_R2) != 0 || g_pad_rt >= TRIGGER_THRESHOLD;
+    const float trigger = param(JFG_PARAM_TRIGGER);
+    uint32_t b = g_pad_buttons;
+    if (param_on(JFG_PARAM_SWAP_AB))
+        b = (b & ~(uint32_t)(JFG_PAD_A | JFG_PAD_B)) | ((b & JFG_PAD_A) ? JFG_PAD_B : 0) | ((b & JFG_PAD_B) ? JFG_PAD_A : 0);
+    if (param_on(JFG_PARAM_SWAP_XY))
+        b = (b & ~(uint32_t)(JFG_PAD_X | JFG_PAD_Y)) | ((b & JFG_PAD_X) ? JFG_PAD_Y : 0) | ((b & JFG_PAD_Y) ? JFG_PAD_X : 0);
+    pad->buttons = b;
+    normalise_stick(g_pad_lx, g_pad_ly, param(JFG_PARAM_DEADZONE_LEFT), &pad->lx, &pad->ly);
+    normalise_stick(g_pad_rx, g_pad_ry, param(JFG_PARAM_DEADZONE_RIGHT), &pad->rx, &pad->ry);
+    pad->aim = (pad->buttons & JFG_PAD_L2) != 0 || g_pad_lt >= trigger;
+    pad->fire = (pad->buttons & JFG_PAD_R2) != 0 || g_pad_rt >= trigger;
 }
 
 /* Y and X are weapon notches: a rising edge queues a single-poll impulse, from
@@ -962,13 +1023,13 @@ void jfg_camera_new_vi(void)
     struct jfg_eval eval;
     uint32_t player_object = 0, player_data = 0, control_camera = 0, joy_disabled = 1, robot = 0;
     uint8_t paused = 1, camera_mode = 0;
-    int ready, result, speed;
+    int ready, result;
     int32_t dx = 0, dy = 0;
 
     if (!g_rom_supported)
         return;
 
-    if (!g_cfg_enabled || !g_pad_seen || netplay_is_init())
+    if (!param_on(JFG_PARAM_ENABLED) || !g_pad_seen || netplay_is_init())
     {
         if (g_installed || g_maybe_dirty)
             deactivate();
@@ -1015,17 +1076,17 @@ void jfg_camera_new_vi(void)
         return;
     }
 
-    /* The right stick becomes camera counts per video frame, squared for fine
-     * control near the centre, with the fraction carried to the next frame. */
-    speed = g_cfg_speed;
-    if (speed < 1) speed = 1;
-    if (speed > 10) speed = 10;
+    /* The right stick becomes camera counts per video frame, shaped by the
+     * response curve, with the fraction carried to the next frame. */
     if (!pad.aim && (pad.rx != 0.0f || pad.ry != 0.0f))
     {
-        const float rate = (float)speed * COUNTS_PER_SPEED;
-        const float ry = g_cfg_invert_y ? -pad.ry : pad.ry;
-        const float ax = pad.rx * fabsf(pad.rx) * rate + g_orbit.carry_x;
-        const float ay = ry * fabsf(ry) * rate + g_orbit.carry_y;
+        const float curve = param(JFG_PARAM_CURVE);
+        const float rx = param_on(JFG_PARAM_INVERT_X) ? -pad.rx : pad.rx;
+        const float ry = param_on(JFG_PARAM_INVERT_Y) ? -pad.ry : pad.ry;
+        const float sx = (rx < 0.0f ? -1.0f : 1.0f) * powf(fabsf(rx), curve);
+        const float sy = (ry < 0.0f ? -1.0f : 1.0f) * powf(fabsf(ry), curve);
+        const float ax = sx * param(JFG_PARAM_SPEED_X) * COUNTS_PER_SPEED + g_orbit.carry_x;
+        const float ay = sy * param(JFG_PARAM_SPEED_Y) * COUNTS_PER_SPEED + g_orbit.carry_y;
         dx = (int32_t)ax;
         dy = (int32_t)ay;
         g_orbit.carry_x = ax - (float)dx;
@@ -1062,7 +1123,7 @@ void jfg_camera_filter_input(int control, uint32_t* value)
     int8_t x = 0, y = 0;
 
     if (control != 0 || !g_rom_supported || !g_scheme_active || !g_installed ||
-        !g_cfg_enabled || !g_pad_seen || value == NULL)
+        !param_on(JFG_PARAM_ENABLED) || !g_pad_seen || value == NULL)
         return;
     if (!read_control_masks(masks) || !get_player_data(&player_object, &player_data) ||
         !rd_u8(player_data + PLAYER_CAMERA_MODE_OFFSET, &camera_mode))
@@ -1099,8 +1160,8 @@ void jfg_camera_filter_input(int control, uint32_t* value)
          * left stick on the sidesteps. */
         if (left)  out |= hw_to_plugin(masks[5]);
         if (right) out |= hw_to_plugin(masks[6]);
-        x = stick_to_n64(pad.rx);
-        y = stick_to_n64(pad.ry);
+        x = aim_axis(pad.rx);
+        y = aim_axis(pad.ry);
     }
     else if (pad.aim)
     {
@@ -1112,8 +1173,8 @@ void jfg_camera_filter_input(int control, uint32_t* value)
         if (backward) out |= hw_to_plugin(masks[8]);
         if (left)     out |= hw_to_plugin(masks[5]);
         if (right)    out |= hw_to_plugin(masks[6]);
-        x = stick_to_n64(pad.rx);
-        y = stick_to_n64(pad.ry);
+        x = aim_axis(pad.rx);
+        y = aim_axis(pad.ry);
     }
     else if (camera_mode == CAMERA_MODE_CROUCH || camera_mode == CAMERA_MODE_PRONE)
     {
@@ -1137,11 +1198,21 @@ void jfg_camera_filter_input(int control, uint32_t* value)
 /* Frontend                                                                  */
 /* ------------------------------------------------------------------------ */
 
-EXPORT void CALL JfgCameraConfigure(int enabled, int speed, int invertY)
+EXPORT void CALL JfgCameraSetParam(int id, float value)
 {
-    g_cfg_enabled = enabled != 0;
-    g_cfg_speed = speed;
-    g_cfg_invert_y = invertY != 0;
+    if (id < 0 || id >= JFG_PARAM_COUNT || value != value)
+        return;
+    init_params();
+    if (value < g_param_info[id].min) value = g_param_info[id].min;
+    if (value > g_param_info[id].max) value = g_param_info[id].max;
+    g_param[id] = value;
+}
+
+EXPORT float CALL JfgCameraGetParam(int id)
+{
+    if (id < 0 || id >= JFG_PARAM_COUNT)
+        return 0.0f;
+    return param(id);
 }
 
 EXPORT void CALL JfgCameraSetPad(unsigned int buttons, float lx, float ly, float rx, float ry, float lt, float rt)
@@ -1158,5 +1229,5 @@ EXPORT void CALL JfgCameraSetPad(unsigned int buttons, float lx, float ly, float
 
 EXPORT int CALL JfgCameraStatus(void)
 {
-    return g_rom_supported && g_cfg_enabled ? g_status : 0;
+    return g_rom_supported && param_on(JFG_PARAM_ENABLED) ? g_status : 0;
 }

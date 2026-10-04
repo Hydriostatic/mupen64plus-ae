@@ -403,6 +403,9 @@
             </intent-filter>
         </activity>
         <activity android:name="paulscode.android.mupen64plusae.profile.ProfileActivity" />
+        <activity android:name="paulscode.android.mupen64plusae.game.JetForceGeminiCameraSettingsActivity"
+            android:exported="false"
+            android:label="@string/jfgPanel_title" />
 
         <service android:name="paulscode.android.mupen64plusae.task.CacheRomInfoService"
             android:foregroundServiceType="dataSync"

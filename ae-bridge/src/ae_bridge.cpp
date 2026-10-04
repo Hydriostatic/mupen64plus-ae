@@ -132,33 +132,40 @@ extern "C" DECLSPEC uint32_t aeReadRdram(uint32_t address, uint8_t* out, uint32_
 }
 
 // ---------- Jet Force Gemini (USA) twin-stick camera ----------
-// The camera itself lives in the core (main/jfg_camera.c). These forward the
-// setting and the raw gamepad state to it; the setting is kept here so it can
-// be given before the core library is loaded.
-typedef void (*ptr_JfgCameraConfigure)(int, int, int);
+// The camera itself lives in the core (main/jfg_camera.c). These forward its
+// tunables and the raw gamepad state to it. Tunables are remembered here so they
+// can be set before the core library is loaded, and are replayed when it is.
+typedef void (*ptr_JfgCameraSetParam)(int, float);
 typedef void (*ptr_JfgCameraSetPad)(unsigned int, float, float, float, float, float, float);
 typedef int (*ptr_JfgCameraStatus)(void);
+enum { JFG_MAX_PARAMS = 32 };
 static m64p_dynlib_handle      g_jfg_core = NULL;
-static ptr_JfgCameraConfigure  g_jfg_configure = NULL;
+static ptr_JfgCameraSetParam   g_jfg_set_param = NULL;
 static ptr_JfgCameraSetPad     g_jfg_set_pad = NULL;
 static ptr_JfgCameraStatus     g_jfg_status = NULL;
-static int g_jfg_enabled = 1, g_jfg_speed = 5, g_jfg_invert_y = 0;
+static float g_jfg_params[JFG_MAX_PARAMS];
+static bool  g_jfg_param_set[JFG_MAX_PARAMS];
 
 static bool jfgResolve() {
     if (CoreHandle == NULL) return false;
     if (g_jfg_core != CoreHandle) {
         g_jfg_core = CoreHandle;
-        g_jfg_configure = (ptr_JfgCameraConfigure) dlsym(CoreHandle, "JfgCameraConfigure");
-        g_jfg_set_pad   = (ptr_JfgCameraSetPad)    dlsym(CoreHandle, "JfgCameraSetPad");
-        g_jfg_status    = (ptr_JfgCameraStatus)    dlsym(CoreHandle, "JfgCameraStatus");
-        if (g_jfg_configure) g_jfg_configure(g_jfg_enabled, g_jfg_speed, g_jfg_invert_y);
+        g_jfg_set_param = (ptr_JfgCameraSetParam) dlsym(CoreHandle, "JfgCameraSetParam");
+        g_jfg_set_pad   = (ptr_JfgCameraSetPad)   dlsym(CoreHandle, "JfgCameraSetPad");
+        g_jfg_status    = (ptr_JfgCameraStatus)   dlsym(CoreHandle, "JfgCameraStatus");
+        if (g_jfg_set_param) {
+            for (int i = 0; i < JFG_MAX_PARAMS; i++)
+                if (g_jfg_param_set[i]) g_jfg_set_param(i, g_jfg_params[i]);
+        }
     }
     return g_jfg_set_pad != NULL;
 }
 
-extern "C" DECLSPEC void aeJfgConfigure(int enabled, int speed, int invertY) {
-    g_jfg_enabled = enabled; g_jfg_speed = speed; g_jfg_invert_y = invertY;
-    if (jfgResolve() && g_jfg_configure) g_jfg_configure(enabled, speed, invertY);
+extern "C" DECLSPEC void aeJfgSetParam(int id, float value) {
+    if (id < 0 || id >= JFG_MAX_PARAMS) return;
+    g_jfg_params[id] = value;
+    g_jfg_param_set[id] = true;
+    if (jfgResolve() && g_jfg_set_param) g_jfg_set_param(id, value);
 }
 
 extern "C" DECLSPEC void aeJfgSetPad(int buttons, float lx, float ly, float rx, float ry, float lt, float rt) {

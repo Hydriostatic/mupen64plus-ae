@@ -40,6 +40,28 @@ enum
     JFG_PAD_DRIGHT = 1 << 15
 };
 
+/* Tunables, set with JfgCameraSetParam (values are clamped to their range) */
+enum
+{
+    JFG_PARAM_ENABLED = 0,     /* 0/1, default 1 */
+    JFG_PARAM_SPEED_X,         /* horizontal camera speed 1..20, default 5 */
+    JFG_PARAM_SPEED_Y,         /* vertical camera speed 1..20, default 5 */
+    JFG_PARAM_INVERT_X,        /* 0/1 */
+    JFG_PARAM_INVERT_Y,        /* 0/1 */
+    JFG_PARAM_CURVE,           /* stick response exponent 1..3, default 2 */
+    JFG_PARAM_DEADZONE_RIGHT,  /* 0..0.6, default 0.2 */
+    JFG_PARAM_DEADZONE_LEFT,   /* 0..0.6, default 0.2 */
+    JFG_PARAM_TRIGGER,         /* trigger press point 0.05..0.95, default 0.25 */
+    JFG_PARAM_HEIGHT_LIMIT,    /* how far the camera may be raised/lowered 0..400, default 200 */
+    JFG_PARAM_ALIGN_ON_AIM,    /* 0/1: aiming turns the player to the camera, default 1 */
+    JFG_PARAM_FREE_IN_JUMP,    /* 0/1: free camera while jumping, default 1 */
+    JFG_PARAM_KEEP_GAME_CAMS,  /* 0/1: keep the game's camera in special areas, default 1 */
+    JFG_PARAM_SWAP_AB,         /* 0/1: swap jump and crouch */
+    JFG_PARAM_SWAP_XY,         /* 0/1: swap next and previous weapon */
+    JFG_PARAM_AIM_SPEED,       /* reticle speed multiplier 0.25..3, default 1 */
+    JFG_PARAM_COUNT
+};
+
 /* Core hooks */
 void jfg_camera_rom_started(void);
 void jfg_camera_state_loaded(void);
@@ -48,7 +70,8 @@ void jfg_camera_new_vi(void);
 void jfg_camera_filter_input(int control, uint32_t* value);
 
 /* Frontend entry points (looked up with dlsym) */
-EXPORT void CALL JfgCameraConfigure(int enabled, int speed, int invertY);
+EXPORT void CALL JfgCameraSetParam(int id, float value);
+EXPORT float CALL JfgCameraGetParam(int id);
 /* Sticks are -1..1 with Android's signs (right and down positive), triggers 0..1 */
 EXPORT void CALL JfgCameraSetPad(unsigned int buttons, float lx, float ly, float rx, float ry, float lt, float rt);
 /* 0 = not Jet Force Gemini (USA) / off, 1 = waiting for gameplay, 2 = camera active */

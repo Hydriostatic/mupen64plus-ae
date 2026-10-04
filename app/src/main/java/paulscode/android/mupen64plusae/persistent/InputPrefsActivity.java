@@ -122,6 +122,17 @@ public class InputPrefsActivity extends AppCompatPreferenceActivity implements O
 
     private void refreshViews()
     {
+        // Jet Force Gemini camera: its own page (the same one the game shows on the second screen)
+        final androidx.preference.Preference jfgCamera = findPreference("jfgCameraSettings");
+        if (jfgCamera != null)
+        {
+            jfgCamera.setOnPreferenceClickListener(preference -> {
+                startActivity(new android.content.Intent(this,
+                        paulscode.android.mupen64plusae.game.JetForceGeminiCameraSettingsActivity.class));
+                return true;
+            });
+        }
+
         // Refresh the preferences object
         mGlobalPrefs = new GlobalPrefs(this, mAppData);
 

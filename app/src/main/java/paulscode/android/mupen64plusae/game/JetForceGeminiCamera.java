@@ -1,14 +1,11 @@
 package paulscode.android.mupen64plusae.game;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.widget.Toast;
-
-import androidx.preference.PreferenceManager;
 
 import com.sun.jna.Native;
 
@@ -71,24 +68,48 @@ public final class JetForceGeminiCamera
         sActive = false;
         if (!isJetForceGeminiUsa(romHeaderName, countryCode))
             return;
-
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        boolean enabled = prefs.getBoolean("jfgTwinStickCamera", true);
-        int speed = 5;
-        try {
-            speed = Integer.parseInt(prefs.getString("jfgCameraSpeed", "5"));
-        } catch (NumberFormatException ignored) {
-        }
-        boolean invertY = prefs.getBoolean("jfgCameraInvertY", false);
-
-        AeBridgeLibrary b = bridge();
-        if (b == null)
+        if (bridge() == null)
             return;
-        b.aeJfgConfigure(enabled ? 1 : 0, speed, invertY ? 1 : 0);
-        sActive = enabled;
+
+        // The pad tap runs for the whole game so the camera can be switched on live
+        JetForceGeminiCameraSettings settings = JetForceGeminiCameraSettings.load(context);
+        applyAll(settings);
+        sActive = true;
+        boolean enabled = settings.get(0) >= 0.5f;
         Log.i(TAG, "Jet Force Gemini (USA): twin-stick camera " + (enabled ? "on" : "off"));
         if (enabled)
             Toast.makeText(context, R.string.jfgCamera_active, Toast.LENGTH_LONG).show();
+    }
+
+    /** True while a Jet Force Gemini (USA) game is running in this process. */
+    public static boolean isRunning()
+    {
+        return sActive;
+    }
+
+    /** Sends every tunable to the core (only while the game runs in this process). */
+    public static void applyAll(JetForceGeminiCameraSettings settings)
+    {
+        AeBridgeLibrary b = sBridge;
+        if (b == null)
+            return;
+        for (int i = 0; i < JetForceGeminiCameraSettings.PARAMS.length; i++)
+            b.aeJfgSetParam(JetForceGeminiCameraSettings.PARAMS[i].id, settings.get(i));
+    }
+
+    /** Sends one tunable to the core, live (only while the game runs in this process). */
+    public static void apply(int index, float value)
+    {
+        AeBridgeLibrary b = sBridge;
+        if (b != null && sActive)
+            b.aeJfgSetParam(JetForceGeminiCameraSettings.PARAMS[index].id, value);
+    }
+
+    /** 0 = off, 1 = waiting for gameplay, 2 = camera active */
+    public static int status()
+    {
+        AeBridgeLibrary b = sBridge;
+        return b != null && sActive ? b.aeJfgStatus() : 0;
     }
 
     public static void stop()
