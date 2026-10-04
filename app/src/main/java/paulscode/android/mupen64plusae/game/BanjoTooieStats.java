@@ -48,6 +48,27 @@ public final class BanjoTooieStats
     private static final int CHARACTER = 0x12704C;
     private static final int FLAG_BLOCK_PTR = 0x12C770;
     private static final int FLAG_BLOCK_SIZE = 160;
+    static final int CHARACTER_SLOTS = HEALTH_TABLE_SIZE / 3;
+
+    /** Characters shown on the Character & health page, in display order. */
+    static final int[] PLAYABLE_CHARACTERS = {
+            0x01, 0x0A, 0x0B, 0x0D, 0x02, 0x06, 0x07, 0x08, 0x0C, 0x0F, 0x10, 0x12, 0x13, 0x0E
+    };
+
+    /** Normal carrying capacity (before the in-game "double" cheats), for the ammo bars. */
+    static int capacity(int consumable)
+    {
+        switch (consumable) {
+            case BLUE_EGGS: return 100;
+            case FIRE_EGGS: return 50;
+            case ICE_EGGS: return 50;
+            case GRENADE_EGGS: return 25;
+            case CLOCKWORK_EGGS: return 10;
+            case RED_FEATHERS: return 100;
+            case GOLD_FEATHERS: return 10;
+            default: return 0;
+        }
+    }
 
     // --- Consumable indices ---
     static final int BLUE_EGGS = 0, FIRE_EGGS = 1, ICE_EGGS = 2, GRENADE_EGGS = 3,
@@ -143,6 +164,9 @@ public final class BanjoTooieStats
         public int health = -1, maxHealth = -1;
         public final int[] consumables = new int[CONSUMABLE_COUNT];
         public int jiggies, notes, jinjos, cheatoPages, emptyHoneycombs, glowbos, doubloons;
+        /** Health of every character, indexed by character id (-1 = no entry). */
+        public final int[] allHealth = new int[CHARACTER_SLOTS];
+        public final int[] allMaxHealth = new int[CHARACTER_SLOTS];
         /** Raw values for checking the addresses on a real game. */
         public int flagBlockAddress;
         public final int[] healthBytes = new int[3];
@@ -208,6 +232,11 @@ public final class BanjoTooieStats
 
         s.health = s.maxHealth = -1;
         if (read(HEALTH_TABLE, mHealth, mHealth.length)) {
+            for (int id = 0; id < CHARACTER_SLOTS; id++) {
+                int cur = u8(mHealth, id * 3 + 1), max = u8(mHealth, id * 3 + 2);
+                s.allHealth[id] = cur;
+                s.allMaxHealth[id] = max > 0 ? max : cur;
+            }
             int entry = s.character * 3;
             if (s.character > 0 && entry + 2 < mHealth.length) {
                 s.healthBytes[0] = u8(mHealth, entry);
