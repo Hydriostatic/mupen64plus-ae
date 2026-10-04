@@ -391,9 +391,10 @@
   <!--Controller Diagnostics-->
   <string name="diagnosticActivity_textKey_text">Apertar botão ou tecla...</string>
   <string name="diagnosticActivity_textMotion_text">Touch screen ou controle...</string>
-    <string name="inGameMenuSecondScreen_title">Mostrar menu do jogo na segunda tela</string>
-    <string name="inGameMenuSecondScreen_summary">Em aparelhos com duas telas, como o AYN Thor, mostra o menu do jogo na segunda tela em vez da gaveta lateral</string>
+    <string name="inGameMenuSecondScreen_title">Mostrar menus na segunda tela</string>
+    <string name="inGameMenuSecondScreen_summary">Em aparelhos com duas telas, como o AYN Thor, mostra os menus do app e o menu do jogo na segunda tela em vez da gaveta lateral</string>
     <string name="secondScreenMenu_paused">Pausado</string>
+    <string name="secondScreenMenu_back">Voltar</string>
     <string name="secondScreenMenu_resume">Voltar ao jogo</string>
     <string name="secondScreenMenu_tapToOpen">Toque para pausar e abrir o menu</string>
 </resources>

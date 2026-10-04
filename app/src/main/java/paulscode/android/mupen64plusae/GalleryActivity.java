@@ -61,6 +61,8 @@ import androidx.core.view.GravityCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+import paulscode.android.mupen64plusae.game.DualScreenDrawerLayout;
+import paulscode.android.mupen64plusae.game.SecondScreenAppMenuActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -124,7 +126,7 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
 
     // Widgets
     private RecyclerView mGridView;
-    private DrawerLayout mDrawerLayout = null;
+    private DualScreenDrawerLayout mDrawerLayout = null;
     private ActionBarDrawerToggle mDrawerToggle;
     private GameSidebar mDrawerList;
     private GameSidebar mGameSidebar;
@@ -466,6 +468,10 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
         mDrawerToggle.setDrawerIndicatorEnabled(false);
 
         mDrawerLayout.addDrawerListener( mDrawerToggle );
+
+        // On dual-screen devices (e.g. AYN Thor) keep the app menus on the second screen
+        mDrawerLayout.setSecondScreenEnabled(mGlobalPrefs.inGameMenuOnSecondScreen, true,
+                SecondScreenAppMenuActivity.class);
 
         // Configure the list in the navigation drawer
         mDrawerList = findViewById( R.id.drawerNavigation );

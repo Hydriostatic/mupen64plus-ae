@@ -94,8 +94,10 @@ public class SecondScreenMenuActivity extends Activity
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         buildLayout();
-        android.widget.Toast.makeText(this, "2nd screen: menu opened here (screen " + actualDisplay + ")",
-                android.widget.Toast.LENGTH_SHORT).show();
+        if (DualScreenDrawerLayout.DIAGNOSTICS) {
+            android.widget.Toast.makeText(this, "2nd screen: menu opened here (screen " + actualDisplay + ")",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        }
         mHost.onMenuScreenReady(this);
     }
 
@@ -120,15 +122,17 @@ public class SecondScreenMenuActivity extends Activity
         topBar.setPadding(pad, pad / 2, pad, pad / 2);
         topBar.setBackgroundColor(0xFF202020);
 
+        final boolean alwaysActive = mHost.isAlwaysActive();
+
         TextView paused = new TextView(ctx);
-        paused.setText(R.string.secondScreenMenu_paused);
+        paused.setText(alwaysActive ? R.string.app_name : R.string.secondScreenMenu_paused);
         paused.setTextColor(Color.WHITE);
         paused.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         topBar.addView(paused, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         Button resume = new Button(ctx);
-        resume.setText(R.string.secondScreenMenu_resume);
+        resume.setText(alwaysActive ? R.string.secondScreenMenu_back : R.string.secondScreenMenu_resume);
         resume.setFocusable(false); // keep controller focus on the menu list
         resume.setOnClickListener(v -> {
             if (mHost != null) mHost.closeDrawer(Gravity.START);
@@ -206,8 +210,10 @@ public class SecondScreenMenuActivity extends Activity
     private void applyMenuState()
     {
         if (mTopBar == null) return;
+        // App menus are always usable; the in-game menu is dimmed until opened (game paused)
+        boolean alwaysActive = mHost != null && mHost.isAlwaysActive();
         mTopBar.setVisibility(mMenuOpen ? View.VISIBLE : View.GONE);
-        mDimOverlay.setVisibility(mMenuOpen ? View.GONE : View.VISIBLE);
+        mDimOverlay.setVisibility(mMenuOpen || alwaysActive ? View.GONE : View.VISIBLE);
     }
 
     private void focusMenu()

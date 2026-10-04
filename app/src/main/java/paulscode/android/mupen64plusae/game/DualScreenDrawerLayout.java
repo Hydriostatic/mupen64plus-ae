@@ -61,7 +61,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private static final String TAG = "DualScreenDrawer";
 
     /** Show a short message at each step (for testing on new devices). */
-    private static final boolean DIAGNOSTICS = true;
+    static final boolean DIAGNOSTICS = false;
 
     private static final long LAUNCH_TIMEOUT_MS = 4000;
 
@@ -76,6 +76,9 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private ViewGroup.LayoutParams mDrawerLayoutParams;
 
     private boolean mSecondScreenWanted = false;
+    /** True for app menus (always usable); false for the in-game menu (opening it pauses). */
+    private boolean mAlwaysActive = false;
+    private Class<? extends SecondScreenMenuActivity> mMenuActivityClass = SecondScreenMenuActivity.class;
     private boolean mSecondScreenActive = false;
     private int mTargetDisplayId = -1;
     private SecondScreenMenuActivity mMenuScreen;
@@ -132,7 +135,21 @@ public class DualScreenDrawerLayout extends DrawerLayout
      */
     public void setSecondScreenEnabled(boolean enabled)
     {
+        setSecondScreenEnabled(enabled, false, SecondScreenMenuActivity.class);
+    }
+
+    /**
+     * @param alwaysActive  true for app menus that are always usable on the second screen (main
+     *                      screen); false for the in-game menu, which is dimmed until opened
+     * @param menuActivity  the activity hosting the menu; it must run in the same process as the
+     *                      caller, since it displays the caller's own views
+     */
+    public void setSecondScreenEnabled(boolean enabled, boolean alwaysActive,
+                                       Class<? extends SecondScreenMenuActivity> menuActivity)
+    {
         mSecondScreenWanted = enabled;
+        mAlwaysActive = alwaysActive;
+        mMenuActivityClass = menuActivity;
 
         if (mDisplayManager == null) {
             mDisplayManager = (DisplayManager) getContext().getSystemService(Context.DISPLAY_SERVICE);
@@ -239,7 +256,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
         SecondScreenMenuActivity.setHost(this);
 
-        Intent intent = new Intent(activity, SecondScreenMenuActivity.class);
+        Intent intent = new Intent(activity, mMenuActivityClass);
         intent.putExtra(SecondScreenMenuActivity.EXTRA_DISPLAY_ID, mTargetDisplayId);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
 
@@ -555,5 +572,10 @@ public class DualScreenDrawerLayout extends DrawerLayout
     boolean isMenuOpen()
     {
         return mMenuOpen;
+    }
+
+    boolean isAlwaysActive()
+    {
+        return mAlwaysActive;
     }
 }
