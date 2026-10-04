@@ -27,6 +27,8 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 
+import paulscode.android.mupen64plusae.game.JetForceGeminiCamera;
+
 /**
  * A class for transforming Android KeyEvent inputs into a common format.
  */
@@ -118,6 +120,9 @@ public class KeyProvider extends AbstractProvider implements View.OnKeyListener,
      */
     public boolean onKey( int keyCode, KeyEvent event )
     {
+        // Jet Force Gemini (USA) twin-stick camera reads the raw pad
+        JetForceGeminiCamera.onKey( keyCode, event );
+
         // Ignore specified key codes
         if( mIgnoredCodes != null && mIgnoredCodes.contains( keyCode ) )
         {

@@ -24,6 +24,8 @@ import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 
+import paulscode.android.mupen64plusae.game.JetForceGeminiCamera;
+
 import paulscode.android.mupen64plusae.input.map.AxisMap;
 
 /**
@@ -79,6 +81,9 @@ public class AxisProvider extends AbstractProvider implements View.OnGenericMoti
     @Override
     public boolean onGenericMotion(View v, MotionEvent event )
     {
+        // Jet Force Gemini (USA) twin-stick camera reads the raw pad
+        JetForceGeminiCamera.onMotion( event );
+
         boolean isJoystick = (((event.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK) ||
                 ((event.getSource() & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD)) &&
             event.getAction() == MotionEvent.ACTION_MOVE;

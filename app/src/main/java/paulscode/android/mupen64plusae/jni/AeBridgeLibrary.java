@@ -49,6 +49,11 @@ public interface AeBridgeLibrary extends Library {
     // Copy N64 RDRAM bytes (big-endian order) into out; returns the number of bytes copied
     int aeReadRdram(int address, byte[] out, int length);
 
+    // Jet Force Gemini (USA) twin-stick camera, see mupen64plus-core main/jfg_camera.c
+    void aeJfgConfigure(int enabled, int speed, int invertY);
+    void aeJfgSetPad(int buttons, float lx, float ly, float rx, float ry, float lt, float rt);
+    int aeJfgStatus();
+
     // RetroAchievements: create rc_client and log in with a saved API token
     void rcheevosInit(String username, String token);
 

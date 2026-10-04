@@ -131,6 +131,44 @@ extern "C" DECLSPEC uint32_t aeReadRdram(uint32_t address, uint8_t* out, uint32_
     return i;
 }
 
+// ---------- Jet Force Gemini (USA) twin-stick camera ----------
+// The camera itself lives in the core (main/jfg_camera.c). These forward the
+// setting and the raw gamepad state to it; the setting is kept here so it can
+// be given before the core library is loaded.
+typedef void (*ptr_JfgCameraConfigure)(int, int, int);
+typedef void (*ptr_JfgCameraSetPad)(unsigned int, float, float, float, float, float, float);
+typedef int (*ptr_JfgCameraStatus)(void);
+static m64p_dynlib_handle      g_jfg_core = NULL;
+static ptr_JfgCameraConfigure  g_jfg_configure = NULL;
+static ptr_JfgCameraSetPad     g_jfg_set_pad = NULL;
+static ptr_JfgCameraStatus     g_jfg_status = NULL;
+static int g_jfg_enabled = 1, g_jfg_speed = 5, g_jfg_invert_y = 0;
+
+static bool jfgResolve() {
+    if (CoreHandle == NULL) return false;
+    if (g_jfg_core != CoreHandle) {
+        g_jfg_core = CoreHandle;
+        g_jfg_configure = (ptr_JfgCameraConfigure) dlsym(CoreHandle, "JfgCameraConfigure");
+        g_jfg_set_pad   = (ptr_JfgCameraSetPad)    dlsym(CoreHandle, "JfgCameraSetPad");
+        g_jfg_status    = (ptr_JfgCameraStatus)    dlsym(CoreHandle, "JfgCameraStatus");
+        if (g_jfg_configure) g_jfg_configure(g_jfg_enabled, g_jfg_speed, g_jfg_invert_y);
+    }
+    return g_jfg_set_pad != NULL;
+}
+
+extern "C" DECLSPEC void aeJfgConfigure(int enabled, int speed, int invertY) {
+    g_jfg_enabled = enabled; g_jfg_speed = speed; g_jfg_invert_y = invertY;
+    if (jfgResolve() && g_jfg_configure) g_jfg_configure(enabled, speed, invertY);
+}
+
+extern "C" DECLSPEC void aeJfgSetPad(int buttons, float lx, float ly, float rx, float ry, float lt, float rt) {
+    if (jfgResolve()) g_jfg_set_pad((unsigned int) buttons, lx, ly, rx, ry, lt, rt);
+}
+
+extern "C" DECLSPEC int aeJfgStatus(void) {
+    return (jfgResolve() && g_jfg_status) ? g_jfg_status() : 0;
+}
+
 static void ra_server_call(const rc_api_request_t* request,
                            rc_client_server_callback_t callback,
                            void* callback_data, rc_client_t*) {

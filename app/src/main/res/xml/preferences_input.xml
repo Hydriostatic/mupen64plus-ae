@@ -123,4 +123,32 @@
         android:summary="@string/inputUseRaphnetAdapter_summary"
         android:title="@string/inputUseRaphnetAdapter_title" />
 
+    <androidx.preference.PreferenceCategory
+        android:key="categoryJfgCamera"
+        android:title="@string/jfgCamera_category" >
+
+        <androidx.preference.CheckBoxPreference
+            android:defaultValue="true"
+            android:key="jfgTwinStickCamera"
+            android:summary="@string/jfgTwinStickCamera_summary"
+            android:title="@string/jfgTwinStickCamera_title" />
+
+        <paulscode.android.mupen64plusae.preference.CompatListPreference
+            android:defaultValue="@string/jfgCameraSpeed_default"
+            android:dependency="jfgTwinStickCamera"
+            android:entries="@array/jfgCameraSpeed_entries"
+            android:entryValues="@array/jfgCameraSpeed_values"
+            android:key="jfgCameraSpeed"
+            android:summary="%s"
+            android:title="@string/jfgCameraSpeed_title" />
+
+        <androidx.preference.CheckBoxPreference
+            android:defaultValue="false"
+            android:dependency="jfgTwinStickCamera"
+            android:key="jfgCameraInvertY"
+            android:summary="@string/jfgCameraInvertY_summary"
+            android:title="@string/jfgCameraInvertY_title" />
+
+    </androidx.preference.PreferenceCategory>
+
 </androidx.preference.PreferenceScreen>

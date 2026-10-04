@@ -49,6 +49,7 @@
 #include "plugin/plugin.h"
 #include "rom.h"
 #include "savestates.h"
+#include "jfg_camera.h"
 #include "util.h"
 #include "workqueue.h"
 
@@ -1476,6 +1477,9 @@ int savestates_load(void)
         }
         free(filepath);
         filepath = NULL;
+
+        if (ret)
+            jfg_camera_state_loaded();
     }
 
     // deliver callback to indicate completion of state loading operation

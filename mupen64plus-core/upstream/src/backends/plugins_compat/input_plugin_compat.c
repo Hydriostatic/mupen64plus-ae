@@ -27,6 +27,7 @@
 #include "plugin/plugin.h"
 
 #include "main/main.h"
+#include "main/jfg_camera.h"
 #include "main/netplay.h"
 
 #include <stdint.h>
@@ -131,6 +132,10 @@ static m64p_error input_plugin_get_input(void* opaque, uint32_t* input_)
 
     cin_compat->last_pak_type = Controls[cin_compat->control_id].Plugin;
     cin_compat->last_input = keys.Value;
+
+    /* Jet Force Gemini (USA): the twin-stick scheme owns port one during gameplay */
+    if (!netplay_is_init())
+        jfg_camera_filter_input(cin_compat->control_id, &keys.Value);
 
     *input_ = keys.Value;
     return M64ERR_SUCCESS;

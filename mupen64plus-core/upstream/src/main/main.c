@@ -65,6 +65,7 @@
 #include "device/gb/gb_cart.h"
 #include "device/pif/bootrom_hle.h"
 #include "eventloop.h"
+#include "jfg_camera.h"
 #include "main.h"
 #include "osal/files.h"
 #include "osal/preproc.h"
@@ -967,6 +968,7 @@ void new_vi(void)
 #endif
 
     gs_apply_cheats(&g_cheat_ctx);
+    jfg_camera_new_vi();
 
     apply_speed_limiter();
     main_check_inputs();
@@ -1873,6 +1875,7 @@ m64p_error main_run(void)
 
     poweron_device(&g_dev);
     pif_bootrom_hle_execute(&g_dev.r4300);
+    jfg_camera_rom_started();
 
     if (setjmp(jump_exit) == 0)
         run_device(&g_dev);

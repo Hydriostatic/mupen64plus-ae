@@ -461,6 +461,9 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
             mDrawerLayout.setInfoPanel(new BanjoTooieStatsView(this));
         }
 
+        // Jet Force Gemini (USA): right stick camera, done in the core
+        JetForceGeminiCamera.start(this, mRomHeaderName, mRomCountryCode);
+
         if (!TextUtils.isEmpty(mRomArtPath) && new File(mRomArtPath).exists() && FileUtil.isFileImage(new File(mRomArtPath)))
             mGameSidebar.setImage(new BitmapDrawable(this.getResources(), mRomArtPath));
 
@@ -762,6 +765,8 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
     public void onDestroy()
     {
         Log.i( TAG, "onDestroy" );
+
+        JetForceGeminiCamera.stop();
 
         super.onDestroy();
 

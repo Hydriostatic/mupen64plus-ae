@@ -1044,4 +1044,13 @@
     <string name="actionSearchRoms">Search ROMs</string>
 
 
+    <!-- Jet Force Gemini (USA) twin-stick camera -->
+    <string name="jfgCamera_category">Jet Force Gemini (USA)</string>
+    <string name="jfgTwinStickCamera_title">Twin-stick camera</string>
+    <string name="jfgTwinStickCamera_summary">During gameplay: left stick moves, right stick turns the camera, L2 aims, R2 fires, A jumps, B crouches, X/Y change weapon, L1/R1 sidestep. Done in the emulator; the ROM is not patched.</string>
+    <string name="jfgCameraSpeed_title">Right stick camera speed</string>
+    <string name="jfgCameraInvertY_title">Invert camera up/down</string>
+    <string name="jfgCameraInvertY_summary">Push the right stick up to raise the camera</string>
+    <string name="jfgCamera_active">Jet Force Gemini: right stick controls the camera</string>
+
 </resources>

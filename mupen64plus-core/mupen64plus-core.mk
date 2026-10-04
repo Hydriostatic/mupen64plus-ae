@@ -42,6 +42,7 @@ LOCAL_SRC_FILES :=                                              \
     $(SRCDIR)/main/cheat.c                                      \
     $(SRCDIR)/device/device.c                                   \
     $(SRCDIR)/main/eventloop.c                                  \
+    $(SRCDIR)/main/jfg_camera.c                                 \
     $(SRCDIR)/main/main.c                                       \
     $(SRCDIR)/main/profile.c                                    \
     $(SRCDIR)/main/rom.c                                        \
