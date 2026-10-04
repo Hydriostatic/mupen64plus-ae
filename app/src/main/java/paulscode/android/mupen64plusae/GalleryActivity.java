@@ -469,10 +469,6 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
 
         mDrawerLayout.addDrawerListener( mDrawerToggle );
 
-        // On dual-screen devices (e.g. AYN Thor) keep the app menus on the second screen
-        mDrawerLayout.setSecondScreenEnabled(mGlobalPrefs.inGameMenuOnSecondScreen, true,
-                SecondScreenAppMenuActivity.class);
-
         // Configure the list in the navigation drawer
         mDrawerList = findViewById( R.id.drawerNavigation );
         mDrawerList.setMenuResource( R.menu.gallery_drawer );
@@ -504,6 +500,12 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
 
         // Handle events from the side bar
         mGameSidebar.setActionHandler(this, R.menu.gallery_game_drawer);
+
+        // On dual-screen devices (e.g. AYN Thor) keep the app menus on the second screen.
+        // Must come after the findViewById calls above: it moves the drawer views out of this
+        // window, so they can't be found here afterwards.
+        mDrawerLayout.setSecondScreenEnabled(mGlobalPrefs.inGameMenuOnSecondScreen, true,
+                SecondScreenAppMenuActivity.class);
 
         // find the retained fragment on activity restarts
         final FragmentManager fm = getSupportFragmentManager();
