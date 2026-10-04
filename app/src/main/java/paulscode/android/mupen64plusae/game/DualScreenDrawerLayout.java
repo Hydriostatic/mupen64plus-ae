@@ -42,19 +42,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A DrawerLayout that, on dual-screen devices (e.g. the AYN Thor), moves the in-game menu
- * drawer onto the secondary display instead of sliding it in from the left.
+ * A DrawerLayout that, on dual-screen devices (e.g. the AYN Thor), moves its drawer (the app
+ * menu, or the in-game menu) onto the secondary display instead of sliding it in from the left.
  *
  * The menu is shown by launching {@link SecondScreenMenuActivity} on the other display. (The
  * Presentation API can't be used for this: Android only allows it on displays flagged as
  * external presentation screens, which built-in second panels usually are not.)
  *
- * All the usual DrawerLayout calls made by GameActivity (openDrawer, closeDrawer, isDrawerOpen
- * and the DrawerListener callbacks) keep the same meaning, so the rest of the activity does not
- * need to know which mode is in use: "drawer open" still means "menu active, emulator paused".
+ * Two modes:
+ * <ul>
+ * <li><b>App menus</b> (game list): "drawer open" keeps its usual meaning (a game's options or
+ *     the main menu has the buttons); closing it gives the buttons back to the game list.</li>
+ * <li><b>In-game</b>: the menu is always live and never pauses the game. The controller drives
+ *     the game; Back/Menu hands the controller to the menu (game keeps running), and Back/Menu
+ *     again hands it back.</li>
+ * </ul>
  *
- * If no usable second display is present, or it goes away while playing, the classic side drawer
- * is used and a short message explains why.
+ * The second screen never goes blank while the app is in use: when there is no menu to show
+ * (e.g. while a game is starting) it shows a plain grey screen. It is closed only when the user
+ * leaves the app.
+ *
+ * If no usable second display is present, or it goes away, the classic side drawer is used.
  */
 public class DualScreenDrawerLayout extends DrawerLayout
 {
@@ -64,6 +72,9 @@ public class DualScreenDrawerLayout extends DrawerLayout
     static final boolean DIAGNOSTICS = false;
 
     private static final long LAUNCH_TIMEOUT_MS = 4000;
+
+    /** How long the grey second screen may sit unused before we assume the app was left. */
+    private static final long LEFT_APP_TIMEOUT_MS = 3000;
 
     /** Only explain a failure once per process, so it doesn't nag on every game launch. */
     private static boolean sFailureShown = false;
@@ -76,16 +87,21 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private ViewGroup.LayoutParams mDrawerLayoutParams;
 
     private boolean mSecondScreenWanted = false;
-    /** True for app menus (always usable); false for the in-game menu (opening it pauses). */
-    private boolean mAlwaysActive = false;
+    /** In-game mode: menu always live, never pauses, controller toggled with Back/Menu. */
+    private boolean mInGame = true;
     private Class<? extends SecondScreenMenuActivity> mMenuActivityClass = SecondScreenMenuActivity.class;
     private boolean mSecondScreenActive = false;
     private int mTargetDisplayId = -1;
     private SecondScreenMenuActivity mMenuScreen;
     private boolean mLaunchPending = false;
+    private boolean mHostVisible = false;
 
     private boolean mMenuOpen = false;
+    /** In-game only: the controller currently drives the menu instead of the game. */
+    private boolean mControllerOnMenu = false;
     private boolean mBypassForwarding = false;
+    /** Back/Menu down was used to toggle the controller; swallow the matching up. */
+    private boolean mSwallowToggleUp = false;
     private DisplayManager mDisplayManager;
 
     /** Fires if the menu screen didn't come up after we asked Android to open it. */
@@ -93,6 +109,14 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (mLaunchPending && mMenuScreen == null && mSecondScreenActive) {
             onMenuScreenFailed("Android didn't open the menu on screen " + mTargetDisplayId +
                     " (no reply after " + (LAUNCH_TIMEOUT_MS / 1000) + "s)");
+        }
+    };
+
+    /** Closes the grey second screen once it's clear the user has left the app. */
+    private final Runnable mLeftAppCheck = () -> {
+        if (!mHostVisible && mMenuScreen != null && mMenuScreen.isShownToUser()) {
+            Log.i(TAG, "App left; closing second screen");
+            finishMenuScreen();
         }
     };
 
@@ -130,8 +154,8 @@ public class DualScreenDrawerLayout extends DrawerLayout
     }
 
     /**
-     * Enable or disable showing the menu on the second screen. Call this from the activity's
-     * onCreate after setContentView and before the first openDrawer call.
+     * In-game menu on the second screen. Call this from the activity's onCreate after
+     * setContentView and after looking up the drawer's views (they are moved out of this window).
      */
     public void setSecondScreenEnabled(boolean enabled)
     {
@@ -139,16 +163,15 @@ public class DualScreenDrawerLayout extends DrawerLayout
     }
 
     /**
-     * @param alwaysActive  true for app menus that are always usable on the second screen (main
-     *                      screen); false for the in-game menu, which is dimmed until opened
+     * @param appMenus      true for the app's menus (game list); false for the in-game menu
      * @param menuActivity  the activity hosting the menu; it must run in the same process as the
      *                      caller, since it displays the caller's own views
      */
-    public void setSecondScreenEnabled(boolean enabled, boolean alwaysActive,
+    public void setSecondScreenEnabled(boolean enabled, boolean appMenus,
                                        Class<? extends SecondScreenMenuActivity> menuActivity)
     {
         mSecondScreenWanted = enabled;
-        mAlwaysActive = alwaysActive;
+        mInGame = !appMenus;
         mMenuActivityClass = menuActivity;
 
         if (mDisplayManager == null) {
@@ -185,7 +208,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
         status("found screens: " + describeDisplays(activity));
         if (target == null) {
             Log.i(TAG, "No usable secondary display. " + describeDisplays(activity));
-            if (explainFailure) {
+            if (explainFailure && DIAGNOSTICS) {
                 showFailure("no second screen found (" + describeDisplays(activity) + ")");
             }
             return;
@@ -212,11 +235,12 @@ public class DualScreenDrawerLayout extends DrawerLayout
         }
         removeView(mDrawerView);
 
-        Log.i(TAG, "Showing in-game menu on display " + target.getDisplayId() + " (" + target.getName() + ")");
+        Log.i(TAG, "Showing menu on display " + target.getDisplayId() + " (" + target.getName() + ")");
         status("opening menu on screen " + target.getDisplayId() + " (" + target.getName() + ")");
         mTargetDisplayId = target.getDisplayId();
         mSecondScreenActive = true;
         mMenuOpen = wasOpen;
+        mControllerOnMenu = false;
 
         launchMenuScreen();
     }
@@ -226,6 +250,8 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (!mSecondScreenActive) return;
         mSecondScreenActive = false;
         mLaunchPending = false;
+        mControllerOnMenu = false;
+        mHandler.removeCallbacks(mLeftAppCheck);
 
         if (mMenuScreen != null) {
             SecondScreenMenuActivity screen = mMenuScreen;
@@ -280,10 +306,24 @@ public class DualScreenDrawerLayout extends DrawerLayout
     {
         mLaunchPending = false;
         mHandler.removeCallbacks(mLaunchTimeout);
+        mHandler.removeCallbacks(mLeftAppCheck);
         if (mMenuScreen != null) {
             SecondScreenMenuActivity screen = mMenuScreen;
             mMenuScreen = null;
             screen.finishFromHost();
+        }
+    }
+
+    /** Show the menu on the second screen if this window is showing, otherwise the grey screen. */
+    private void syncMenuScreen()
+    {
+        if (mMenuScreen == null) return;
+        if (mHostVisible) {
+            mMenuScreen.attachMenu(mDrawerView);
+            mMenuScreen.setMenuOpen(mMenuOpen);
+            updateControllerHint();
+        } else {
+            mMenuScreen.detachMenu();
         }
     }
 
@@ -303,8 +343,17 @@ public class DualScreenDrawerLayout extends DrawerLayout
             mMenuScreen.finishFromHost();
         }
         mMenuScreen = screen;
-        screen.attachMenu(mDrawerView);
-        screen.setMenuOpen(mMenuOpen);
+        syncMenuScreen();
+    }
+
+    /** The second screen came back into view (e.g. the game's own second screen closed). */
+    void onMenuScreenShown(SecondScreenMenuActivity screen)
+    {
+        if (screen != mMenuScreen) return;
+        if (!mHostVisible) {
+            mHandler.removeCallbacks(mLeftAppCheck);
+            mHandler.postDelayed(mLeftAppCheck, LEFT_APP_TIMEOUT_MS);
+        }
     }
 
     void onMenuScreenGone(SecondScreenMenuActivity screen, boolean expected)
@@ -323,7 +372,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
     void onMenuScreenFailed(String reason)
     {
         mLaunchPending = false;
-        // Don't keep retrying for this game session
+        // Don't keep retrying for this session
         mSecondScreenWanted = false;
         leaveSecondScreenMode();
         showFailure(reason);
@@ -358,12 +407,12 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
     private String describeDisplays(@NonNull Activity activity)
     {
-        @SuppressWarnings("deprecation")
-        int ownDisplayId = activity.getWindowManager().getDefaultDisplay().getDisplayId();
-        StringBuilder sb = new StringBuilder("game on " + ownDisplayId + "; displays:");
-        for (Display d : mDisplayManager.getDisplays()) {
-            sb.append(' ').append(d.getDisplayId()).append('=').append(d.getName())
-                    .append("/0x").append(Integer.toHexString(d.getFlags()));
+        StringBuilder sb = new StringBuilder("this on " + SecondScreen.displayOf(activity) + "; displays:");
+        if (mDisplayManager != null) {
+            for (Display d : mDisplayManager.getDisplays()) {
+                sb.append(' ').append(d.getDisplayId()).append('=').append(d.getName())
+                        .append("/0x").append(Integer.toHexString(d.getFlags()));
+            }
         }
         return sb.toString();
     }
@@ -380,20 +429,28 @@ public class DualScreenDrawerLayout extends DrawerLayout
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Window lifecycle: the menu screen follows the game's visibility
+    // Window lifecycle: the second screen follows this window's visibility
     // ---------------------------------------------------------------------------------------------
 
     @Override
     protected void onWindowVisibilityChanged(int visibility)
     {
         super.onWindowVisibilityChanged(visibility);
+        mHostVisible = visibility == View.VISIBLE;
         if (!mSecondScreenActive) return;
 
-        if (visibility == View.VISIBLE) {
-            launchMenuScreen();
+        if (mHostVisible) {
+            mHandler.removeCallbacks(mLeftAppCheck);
+            if (mMenuScreen == null) launchMenuScreen();
+            else syncMenuScreen();
         } else {
-            // Leaving the game (home, recents, exit): take the menu off the other screen too
-            finishMenuScreen();
+            // Another screen of ours (e.g. the game) or the home screen covers this window:
+            // keep the second screen, grey, until we know which
+            if (mMenuScreen != null) {
+                mMenuScreen.detachMenu();
+                mHandler.removeCallbacks(mLeftAppCheck);
+                mHandler.postDelayed(mLeftAppCheck, LEFT_APP_TIMEOUT_MS);
+            }
         }
     }
 
@@ -408,7 +465,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
     }
 
     // ---------------------------------------------------------------------------------------------
-    // DrawerLayout API used by GameActivity
+    // DrawerLayout API used by the activities
     // ---------------------------------------------------------------------------------------------
 
     @Override
@@ -507,31 +564,128 @@ public class DualScreenDrawerLayout extends DrawerLayout
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Input routing between the two screens
+    // Controller routing between the two screens
     // ---------------------------------------------------------------------------------------------
 
+    /** Whether controller buttons currently drive the second-screen menu. */
+    boolean isControllerOnMenu()
+    {
+        return mInGame ? mControllerOnMenu : mMenuOpen;
+    }
+
+    boolean isInGame()
+    {
+        return mInGame;
+    }
+
+    private static boolean isToggleKey(int keyCode)
+    {
+        return keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU;
+    }
+
     /**
-     * Keys reaching the game window while the menu is open are sent to the menu on the second
-     * screen, so controller navigation of the menu works no matter which display has focus.
+     * In-game: Back/Menu hands the controller to the menu or back to the game. The game keeps
+     * running either way. Returns true if the event was used for that.
      */
+    private boolean handleInGameToggle(KeyEvent event)
+    {
+        if (!mInGame || !isToggleKey(event.getKeyCode())) return false;
+
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            if (event.getRepeatCount() == 0) {
+                mControllerOnMenu = !mControllerOnMenu;
+                mSwallowToggleUp = true;
+                if (mMenuScreen != null) {
+                    updateControllerHint();
+                    if (mControllerOnMenu) mMenuScreen.focusMenuForController();
+                }
+            }
+            return true;
+        }
+        if (event.getAction() == KeyEvent.ACTION_UP && mSwallowToggleUp) {
+            mSwallowToggleUp = false;
+            return true;
+        }
+        return true;
+    }
+
+    private void updateControllerHint()
+    {
+        if (mMenuScreen != null) mMenuScreen.showControllerHint(mInGame, mControllerOnMenu);
+    }
+
+    /** Keys arriving at this (main screen) window. */
     @Override
     public boolean dispatchKeyEvent(KeyEvent event)
     {
-        if (mSecondScreenActive && mMenuOpen && !mBypassForwarding && mMenuScreen != null) {
-            return mMenuScreen.dispatchKeyEvent(event);
+        if (!mSecondScreenActive || mBypassForwarding) return super.dispatchKeyEvent(event);
+
+        if (handleInGameToggle(event)) return true;
+
+        // Game list: Back/Menu belong to the list screen (e.g. Back leaves a game's options)
+        if (!mInGame && isToggleKey(event.getKeyCode())) return super.dispatchKeyEvent(event);
+
+        if (isControllerOnMenu() && mMenuScreen != null) {
+            // Never pass these on to the game. Returning "unhandled" for keys the menu ignores
+            // lets Android send its fallback key (e.g. A -> select), which comes back here too.
+            return mMenuScreen.dispatchKeyToMenu(event);
         }
         return super.dispatchKeyEvent(event);
     }
 
+    /** Analog sticks / d-pad axes arriving at this window. */
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent event)
+    {
+        if (mSecondScreenActive && !mBypassForwarding && mInGame && mControllerOnMenu) {
+            // The controller is on the menu: don't move the character
+            if (mMenuScreen != null) mMenuScreen.dispatchMotionToMenu(event);
+            return true;
+        }
+        return super.dispatchGenericMotionEvent(event);
+    }
+
     /**
-     * Send a key event from the second screen to the game. Android moves input focus to whichever
-     * display was touched last, so after tapping the menu screen the controller's buttons would
-     * otherwise go to the menu instead of the game.
+     * A key that arrived at the second-screen window (it gets input focus once it's touched).
+     * Returns true if it was handled here; false means the menu should handle it itself.
      */
-    boolean forwardKeyToGame(KeyEvent event)
+    boolean onKeyFromMenuScreen(KeyEvent event)
+    {
+        if (handleInGameToggle(event)) return true;
+
+        // Back from the menu screen: the activity decides (e.g. game list: back to the list)
+        if (!mInGame && isToggleKey(event.getKeyCode())) {
+            forwardKeyToGame(event);
+            return true;
+        }
+        if (!isControllerOnMenu()) {
+            forwardKeyToGame(event);
+            return true;
+        }
+        return false;
+    }
+
+    boolean onMotionFromMenuScreen(MotionEvent event)
+    {
+        if (!isControllerOnMenu()) {
+            forwardMotionToGame(event);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean forwardKeyToGame(KeyEvent event)
     {
         Activity activity = getActivity();
         if (activity == null) return false;
+
+        // Forwarded keys skip Android's "leave touch mode" step, which would leave the focus
+        // highlight invisible after the screen was touched. Do it here.
+        if (event.getAction() == KeyEvent.ACTION_DOWN && isInTouchMode()) {
+            View focus = activity.getCurrentFocus();
+            if (focus != null) focus.requestFocusFromTouch();
+        }
+
         mBypassForwarding = true;
         try {
             return activity.dispatchKeyEvent(event);
@@ -540,7 +694,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
         }
     }
 
-    boolean forwardMotionToGame(MotionEvent event)
+    private boolean forwardMotionToGame(MotionEvent event)
     {
         Activity activity = getActivity();
         if (activity == null) return false;
@@ -555,10 +709,5 @@ public class DualScreenDrawerLayout extends DrawerLayout
     boolean isMenuOpen()
     {
         return mMenuOpen;
-    }
-
-    boolean isAlwaysActive()
-    {
-        return mAlwaysActive;
     }
 }

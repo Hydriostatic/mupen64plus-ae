@@ -678,6 +678,8 @@
     <string name="inGameMenuSecondScreen_title">Show menus on second screen</string>
     <string name="inGameMenuSecondScreen_summary">On dual-screen devices such as the AYN Thor, show the app menus and the in-game menu on the second screen instead of the side drawer</string>
     <string name="secondScreenMenu_paused">Paused</string>
+    <string name="secondScreenMenu_hintOnGame">Buttons control the game · press Back to use the menu</string>
+    <string name="secondScreenMenu_hintOnMenu">Buttons control the menu · press Back to return to the game</string>
     <string name="secondScreenMenu_back">Back</string>
     <string name="secondScreenMenu_resume">Resume game</string>
     <string name="secondScreenMenu_tapToOpen">Tap to pause and open the menu</string>

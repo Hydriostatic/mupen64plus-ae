@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Second screen (e.g. AYN Thor bottom screen): grey, never blank -->
+    <color name="second_screen_grey">#FF303030</color>
+
+    <style name="Theme.SecondScreen" parent="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+        <item name="android:windowBackground">@color/second_screen_grey</item>
+        <item name="android:colorBackground">@color/second_screen_grey</item>
+    </style>
+</resources>
