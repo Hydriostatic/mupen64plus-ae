@@ -17,8 +17,10 @@
 package paulscode.android.mupen64plusae.game;
 
 import android.app.Activity;
+import android.app.ActivityOptions;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.Intent;
 import android.hardware.display.DisplayManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -30,6 +32,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -42,16 +45,23 @@ import java.util.List;
  * A DrawerLayout that, on dual-screen devices (e.g. the AYN Thor), moves the in-game menu
  * drawer onto the secondary display instead of sliding it in from the left.
  *
+ * The menu is shown by launching {@link SecondScreenMenuActivity} on the other display. (The
+ * Presentation API can't be used for this: Android only allows it on displays flagged as
+ * external presentation screens, which built-in second panels usually are not.)
+ *
  * All the usual DrawerLayout calls made by GameActivity (openDrawer, closeDrawer, isDrawerOpen
  * and the DrawerListener callbacks) keep the same meaning, so the rest of the activity does not
  * need to know which mode is in use: "drawer open" still means "menu active, emulator paused".
  *
- * If no second display is present, or it disappears while playing, the classic side drawer is
- * used.
+ * If no usable second display is present, or it goes away while playing, the classic side drawer
+ * is used and a short message explains why.
  */
 public class DualScreenDrawerLayout extends DrawerLayout
 {
     private static final String TAG = "DualScreenDrawer";
+
+    /** Only explain a failure once per process, so it doesn't nag on every game launch. */
+    private static boolean sFailureShown = false;
 
     private final List<DrawerListener> mListeners = new ArrayList<>();
     private final Handler mHandler = new Handler(Looper.getMainLooper());
@@ -60,10 +70,13 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private View mDrawerView;
     private ViewGroup.LayoutParams mDrawerLayoutParams;
 
-    private SecondScreenMenu mPresentation;
     private boolean mSecondScreenWanted = false;
+    private boolean mSecondScreenActive = false;
+    private int mTargetDisplayId = -1;
+    private SecondScreenMenuActivity mMenuScreen;
+    private boolean mLaunchPending = false;
+
     private boolean mMenuOpen = false;
-    private boolean mIntentionalDismiss = false;
     private boolean mBypassForwarding = false;
     private DisplayManager mDisplayManager;
 
@@ -71,14 +84,14 @@ public class DualScreenDrawerLayout extends DrawerLayout
         @Override
         public void onDisplayAdded(int displayId) {
             // Only move the menu over while it is closed so we don't yank it from under the user
-            if (mPresentation == null && !isDrawerOpen(Gravity.START)) {
-                enterSecondScreenMode();
+            if (!mSecondScreenActive && !isDrawerOpen(Gravity.START)) {
+                enterSecondScreenMode(false);
             }
         }
 
         @Override
         public void onDisplayRemoved(int displayId) {
-            if (mPresentation != null && mPresentation.getDisplay().getDisplayId() == displayId) {
+            if (mSecondScreenActive && displayId == mTargetDisplayId) {
                 leaveSecondScreenMode();
             }
         }
@@ -114,7 +127,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
         if (enabled) {
             mDisplayManager.registerDisplayListener(mDisplayListener, mHandler);
-            enterSecondScreenMode();
+            enterSecondScreenMode(true);
         } else {
             mDisplayManager.unregisterDisplayListener(mDisplayListener);
             leaveSecondScreenMode();
@@ -124,21 +137,26 @@ public class DualScreenDrawerLayout extends DrawerLayout
     /** True while the menu lives on the second screen. */
     public boolean isUsingSecondScreen()
     {
-        return mPresentation != null;
+        return mSecondScreenActive;
     }
 
     // ---------------------------------------------------------------------------------------------
     // Mode switching
     // ---------------------------------------------------------------------------------------------
 
-    private void enterSecondScreenMode()
+    private void enterSecondScreenMode(boolean explainFailure)
     {
-        if (!mSecondScreenWanted || mPresentation != null) return;
+        if (!mSecondScreenWanted || mSecondScreenActive) return;
 
         Activity activity = getActivity();
+        if (activity == null) return;
+
         Display target = findSecondaryDisplay(activity);
-        if (activity == null || target == null) {
-            Log.i(TAG, "No secondary display found, using the side drawer");
+        if (target == null) {
+            Log.i(TAG, "No usable secondary display. " + describeDisplays(activity));
+            if (explainFailure) {
+                showFailure("no second screen found (" + describeDisplays(activity) + ")");
+            }
             return;
         }
 
@@ -161,43 +179,32 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (wasOpen) {
             super.closeDrawer(Gravity.START, false);
         }
-
         removeView(mDrawerView);
 
         Log.i(TAG, "Showing in-game menu on display " + target.getDisplayId() + " (" + target.getName() + ")");
-        mPresentation = new SecondScreenMenu(activity, target, this, mDrawerView);
-        mPresentation.setOnDismissListener(dialog -> {
-            if (!mIntentionalDismiss) {
-                // Display went away or the system dismissed us: fall back to the side drawer
-                mHandler.post(this::leaveSecondScreenMode);
-            }
-        });
+        mTargetDisplayId = target.getDisplayId();
+        mSecondScreenActive = true;
         mMenuOpen = wasOpen;
-        mPresentation.setMenuOpen(mMenuOpen);
 
-        if (isAttachedToWindow() && getWindowVisibility() == View.VISIBLE) {
-            showPresentation();
-        }
+        launchMenuScreen();
     }
 
     private void leaveSecondScreenMode()
     {
-        if (mPresentation == null) return;
+        if (!mSecondScreenActive) return;
+        mSecondScreenActive = false;
+        mLaunchPending = false;
 
-        SecondScreenMenu presentation = mPresentation;
-        mPresentation = null;
-
-        mIntentionalDismiss = true;
-        try {
-            presentation.detachMenu();
-            presentation.dismiss();
-        } catch (Exception e) {
-            Log.w(TAG, "Unable to dismiss second screen menu", e);
-        } finally {
-            mIntentionalDismiss = false;
+        if (mMenuScreen != null) {
+            SecondScreenMenuActivity screen = mMenuScreen;
+            mMenuScreen = null;
+            screen.finishFromHost();
         }
 
-        if (mDrawerView != null && mDrawerView.getParent() == null) {
+        if (mDrawerView != null) {
+            if (mDrawerView.getParent() instanceof ViewGroup) {
+                ((ViewGroup) mDrawerView.getParent()).removeView(mDrawerView);
+            }
             addView(mDrawerView, mDrawerLayoutParams);
         }
 
@@ -208,36 +215,127 @@ public class DualScreenDrawerLayout extends DrawerLayout
         }
     }
 
-    private void showPresentation()
+    private void launchMenuScreen()
     {
-        if (mPresentation == null || mPresentation.isShowing()) return;
+        if (!mSecondScreenActive || mMenuScreen != null || mLaunchPending) return;
+
+        Activity activity = getActivity();
+        if (activity == null || activity.isFinishing()) return;
+
+        SecondScreenMenuActivity.setHost(this);
+
+        Intent intent = new Intent(activity, SecondScreenMenuActivity.class);
+        intent.putExtra(SecondScreenMenuActivity.EXTRA_DISPLAY_ID, mTargetDisplayId);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+
+        ActivityOptions options = ActivityOptions.makeBasic();
+        options.setLaunchDisplayId(mTargetDisplayId);
+
         try {
-            mPresentation.show();
+            mLaunchPending = true;
+            activity.startActivity(intent, options.toBundle());
         } catch (Exception e) {
-            // e.g. WindowManager.InvalidDisplayException
-            Log.w(TAG, "Couldn't show menu on second screen, using side drawer", e);
+            Log.w(TAG, "Couldn't open menu on display " + mTargetDisplayId, e);
+            mLaunchPending = false;
+            onMenuScreenFailed(e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    private void finishMenuScreen()
+    {
+        mLaunchPending = false;
+        if (mMenuScreen != null) {
+            SecondScreenMenuActivity screen = mMenuScreen;
+            mMenuScreen = null;
+            screen.finishFromHost();
+        }
+    }
+
+    // Called by SecondScreenMenuActivity --------------------------------------------------------
+
+    void onMenuScreenReady(SecondScreenMenuActivity screen)
+    {
+        mLaunchPending = false;
+
+        if (!mSecondScreenActive) {
+            screen.finishFromHost();
+            return;
+        }
+        if (mMenuScreen != null && mMenuScreen != screen) {
+            mMenuScreen.finishFromHost();
+        }
+        mMenuScreen = screen;
+        screen.attachMenu(mDrawerView);
+        screen.setMenuOpen(mMenuOpen);
+    }
+
+    void onMenuScreenGone(SecondScreenMenuActivity screen, boolean expected)
+    {
+        if (screen != mMenuScreen) return;
+        mMenuScreen = null;
+
+        if (!expected && mSecondScreenActive) {
+            // Closed by the system or the user from the other screen: go back to the side drawer
+            Log.i(TAG, "Second screen menu was closed, using the side drawer");
             leaveSecondScreenMode();
         }
     }
 
-    @Nullable
-    private Display findSecondaryDisplay(@Nullable Activity activity)
+    void onMenuScreenFailed(String reason)
     {
-        if (mDisplayManager == null || activity == null) return null;
+        mLaunchPending = false;
+        // Don't keep retrying for this game session
+        mSecondScreenWanted = false;
+        leaveSecondScreenMode();
+        showFailure(reason);
+    }
+
+    // Helpers -----------------------------------------------------------------------------------
+
+    private void showFailure(String reason)
+    {
+        if (sFailureShown) return;
+        sFailureShown = true;
+        Toast.makeText(getContext(), "Second screen menu not available: " + reason,
+                Toast.LENGTH_LONG).show();
+    }
+
+    @Nullable
+    private Display findSecondaryDisplay(@NonNull Activity activity)
+    {
+        if (mDisplayManager == null) return null;
 
         @SuppressWarnings("deprecation")
         int ownDisplayId = activity.getWindowManager().getDefaultDisplay().getDisplayId();
 
-        // Prefer displays that the system says are meant for presentations
-        for (Display d : mDisplayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)) {
-            if (d.getDisplayId() != ownDisplayId && d.isValid()) return d;
-        }
-        // Some devices expose their second built-in panel without that category
+        Display fallback = null;
         for (Display d : mDisplayManager.getDisplays()) {
-            if (d.getDisplayId() != ownDisplayId && d.isValid() &&
-                    (d.getFlags() & Display.FLAG_PRIVATE) == 0) return d;
+            if (d.getDisplayId() == ownDisplayId || !d.isValid()) continue;
+            if ((d.getFlags() & Display.FLAG_PRIVATE) != 0) continue;
+            // Prefer built-in panels (like the Thor's bottom screen) over cast/HDMI displays
+            if ((d.getFlags() & Display.FLAG_PRESENTATION) == 0) return d;
+            if (fallback == null) fallback = d;
+        }
+        if (fallback != null) return fallback;
+
+        // The game may be running on a secondary display itself; then use the main one
+        if (ownDisplayId != Display.DEFAULT_DISPLAY) {
+            Display main = mDisplayManager.getDisplay(Display.DEFAULT_DISPLAY);
+            if (main != null && main.isValid()) return main;
         }
         return null;
+    }
+
+    private String describeDisplays(@NonNull Activity activity)
+    {
+        @SuppressWarnings("deprecation")
+        int ownDisplayId = activity.getWindowManager().getDefaultDisplay().getDisplayId();
+        StringBuilder sb = new StringBuilder("game on " + ownDisplayId + "; displays:");
+        for (Display d : mDisplayManager.getDisplays()) {
+            sb.append(' ').append(d.getDisplayId()).append('=').append(d.getName())
+                    .append("/0x").append(Integer.toHexString(d.getFlags()));
+        }
+        return sb.toString();
     }
 
     @Nullable
@@ -252,28 +350,20 @@ public class DualScreenDrawerLayout extends DrawerLayout
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Window lifecycle
+    // Window lifecycle: the menu screen follows the game's visibility
     // ---------------------------------------------------------------------------------------------
-
-    @Override
-    protected void onAttachedToWindow()
-    {
-        super.onAttachedToWindow();
-        if (getWindowVisibility() == View.VISIBLE) {
-            showPresentation();
-        }
-    }
 
     @Override
     protected void onWindowVisibilityChanged(int visibility)
     {
         super.onWindowVisibilityChanged(visibility);
-        if (mPresentation == null) return;
+        if (!mSecondScreenActive) return;
 
         if (visibility == View.VISIBLE) {
-            showPresentation();
-        } else if (mPresentation.isShowing()) {
-            mPresentation.hide();
+            launchMenuScreen();
+        } else {
+            // Leaving the game (home, recents, exit): take the menu off the other screen too
+            finishMenuScreen();
         }
     }
 
@@ -283,15 +373,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (mDisplayManager != null) {
             mDisplayManager.unregisterDisplayListener(mDisplayListener);
         }
-        if (mPresentation != null) {
-            mIntentionalDismiss = true;
-            try {
-                mPresentation.dismiss();
-            } catch (Exception ignored) {
-            } finally {
-                mIntentionalDismiss = false;
-            }
-        }
+        finishMenuScreen();
         super.onDetachedFromWindow();
     }
 
@@ -316,63 +398,63 @@ public class DualScreenDrawerLayout extends DrawerLayout
     @Override
     public void openDrawer(int gravity)
     {
-        if (mPresentation == null) {
+        if (!mSecondScreenActive) {
             super.openDrawer(gravity);
             return;
         }
         if (mMenuOpen) return;
 
         mMenuOpen = true;
-        mPresentation.setMenuOpen(true);
+        if (mMenuScreen != null) mMenuScreen.setMenuOpen(true);
         dispatchMenuState(true);
     }
 
     @Override
     public void openDrawer(int gravity, boolean animate)
     {
-        if (mPresentation == null) super.openDrawer(gravity, animate);
+        if (!mSecondScreenActive) super.openDrawer(gravity, animate);
         else openDrawer(gravity);
     }
 
     @Override
     public void closeDrawer(int gravity)
     {
-        if (mPresentation == null) {
+        if (!mSecondScreenActive) {
             super.closeDrawer(gravity);
             return;
         }
         if (!mMenuOpen) return;
 
         mMenuOpen = false;
-        mPresentation.setMenuOpen(false);
+        if (mMenuScreen != null) mMenuScreen.setMenuOpen(false);
         dispatchMenuState(false);
     }
 
     @Override
     public void closeDrawer(int gravity, boolean animate)
     {
-        if (mPresentation == null) super.closeDrawer(gravity, animate);
+        if (!mSecondScreenActive) super.closeDrawer(gravity, animate);
         else closeDrawer(gravity);
     }
 
     @Override
     public void closeDrawers()
     {
-        if (mPresentation == null) super.closeDrawers();
+        if (!mSecondScreenActive) super.closeDrawers();
         else closeDrawer(Gravity.START);
     }
 
     @Override
     public boolean isDrawerOpen(int drawerGravity)
     {
-        if (mPresentation == null) return super.isDrawerOpen(drawerGravity);
+        if (!mSecondScreenActive) return super.isDrawerOpen(drawerGravity);
         return mMenuOpen;
     }
 
     @Override
     public boolean isDrawerVisible(int drawerGravity)
     {
-        if (mPresentation == null) return super.isDrawerVisible(drawerGravity);
+        if (!mSecondScreenActive) return super.isDrawerVisible(drawerGravity);
         return mMenuOpen;
     }
 
@@ -383,7 +465,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private void dispatchMenuState(final boolean open)
     {
         mHandler.post(() -> {
-            if (mPresentation == null || mMenuOpen != open) return;
+            if (!mSecondScreenActive || mMenuOpen != open) return;
             View drawer = mDrawerView != null ? mDrawerView : this;
             for (DrawerListener l : new ArrayList<>(mListeners)) {
                 l.onDrawerSlide(drawer, open ? 1f : 0f);
@@ -395,7 +477,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Input routing between the two windows
+    // Input routing between the two screens
     // ---------------------------------------------------------------------------------------------
 
     /**
@@ -405,16 +487,16 @@ public class DualScreenDrawerLayout extends DrawerLayout
     @Override
     public boolean dispatchKeyEvent(KeyEvent event)
     {
-        if (mPresentation != null && mMenuOpen && !mBypassForwarding && mPresentation.isShowing()) {
-            return mPresentation.dispatchKeyEvent(event);
+        if (mSecondScreenActive && mMenuOpen && !mBypassForwarding && mMenuScreen != null) {
+            return mMenuScreen.dispatchKeyEvent(event);
         }
         return super.dispatchKeyEvent(event);
     }
 
     /**
-     * Send a key event from the second screen to the game window. Android moves input focus to
-     * whichever display was touched last, so after tapping the menu screen the controller's
-     * buttons would otherwise go to the menu instead of the game.
+     * Send a key event from the second screen to the game. Android moves input focus to whichever
+     * display was touched last, so after tapping the menu screen the controller's buttons would
+     * otherwise go to the menu instead of the game.
      */
     boolean forwardKeyToGame(KeyEvent event)
     {

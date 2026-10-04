@@ -367,6 +367,19 @@
             android:windowActionBar="false"
             android:theme="@style/Theme.Mupen64plusaeTheme.Game"
             android:process=":EmulationProcess"/>
+        <!-- In-game menu shown on the second screen of dual-screen devices (AYN Thor).
+             Must share the game's process: it displays the game's own menu views. -->
+        <activity
+            android:name="paulscode.android.mupen64plusae.game.SecondScreenMenuActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:process=":EmulationProcess"
+            android:taskAffinity="${applicationId}.secondscreen"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
         <activity
             android:name="paulscode.android.mupen64plusae.ImportExportActivity"
             android:exported="false"
