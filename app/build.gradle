@@ -26,6 +26,8 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.debug
+            // Separate package so this AYN Thor build installs next to the official app
+            applicationIdSuffix ".thor"
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             ndk {
