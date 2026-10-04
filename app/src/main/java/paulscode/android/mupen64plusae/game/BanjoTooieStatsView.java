@@ -16,7 +16,22 @@
  */
 package paulscode.android.mupen64plusae.game;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Log;
+import android.widget.Toast;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -116,6 +131,11 @@ public class BanjoTooieStatsView extends FrameLayout
         mBack.setOnClickListener(v -> showPage(PAGE_OVERVIEW));
         header.addView(mBack);
         mTitle = text(ctx, 20, GOLD, true);
+        // Hidden: long-press the title to save a memory snapshot (for adding icons/HUD support)
+        mTitle.setOnLongClickListener(v -> {
+            saveMemorySnapshot();
+            return true;
+        });
         header.addView(mTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         root.addView(header);
 
@@ -548,6 +568,75 @@ public class BanjoTooieStatsView extends FrameLayout
             mPaint.setColor(mColor);
             mRect.set(0, h * 0.2f, w * mFraction, h * 0.8f);
             canvas.drawRoundRect(mRect, h, h, mPaint);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Memory snapshot (developer aid)
+    // ---------------------------------------------------------------------------------------------
+
+    private boolean mSaving = false;
+
+    /**
+     * Save the whole N64 memory to Download/Mupen64BT/ so it can be analysed (finding the game's
+     * own icons and HUD code). Runs in the background; the game keeps running.
+     */
+    private void saveMemorySnapshot()
+    {
+        if (mSaving) return;
+        mSaving = true;
+        final Context ctx = getContext().getApplicationContext();
+        final String name = "bt_memory_" +
+                new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".bin";
+        Toast.makeText(getContext(), "Saving memory snapshot…", Toast.LENGTH_SHORT).show();
+
+        new Thread(() -> {
+            String result;
+            try {
+                byte[] all = new byte[BanjoTooieStats.RDRAM_SIZE];
+                final int chunk = 0x10000;
+                for (int off = 0; off < all.length; off += chunk) {
+                    byte[] buf = new byte[chunk];
+                    if (!BanjoTooieStats.readRaw(off, buf, chunk)) throw new IllegalStateException("game not running");
+                    System.arraycopy(buf, 0, all, off, chunk);
+                }
+                result = write(ctx, name, all);
+            } catch (Exception e) {
+                Log.e("BanjoTooieStats", "Snapshot failed", e);
+                result = null;
+            }
+            final String msg = result != null ? "Saved " + result : "Couldn't save the memory snapshot";
+            mHandler.post(() -> {
+                mSaving = false;
+                Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
+            });
+        }, "BT-snapshot").start();
+    }
+
+    private static String write(Context ctx, String name, byte[] data) throws Exception
+    {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentResolver resolver = ctx.getContentResolver();
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+            values.put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream");
+            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Mupen64BT");
+            Uri uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) throw new IllegalStateException("no download uri");
+            try (OutputStream os = resolver.openOutputStream(uri)) {
+                if (os == null) throw new IllegalStateException("no output stream");
+                os.write(data);
+            }
+            return "Download/Mupen64BT/" + name;
+        } else {
+            File dir = new File(ctx.getExternalFilesDir(null), "Mupen64BT");
+            //noinspection ResultOfMethodCallIgnored
+            dir.mkdirs();
+            File f = new File(dir, name);
+            try (FileOutputStream os = new FileOutputStream(f)) {
+                os.write(data);
+            }
+            return f.getAbsolutePath();
         }
     }
 

@@ -200,6 +200,15 @@ public final class BanjoTooieStats
         return b != null && b.aeReadRdram(address, out, length) == length;
     }
 
+    /** Size of N64 RDRAM (with the Expansion Pak, which Banjo-Tooie requires). */
+    static final int RDRAM_SIZE = 0x800000;
+
+    /** Copy raw N64 memory (big-endian byte order). Returns false if no game is running. */
+    static boolean readRaw(int address, byte[] out, int length)
+    {
+        return read(address, out, length);
+    }
+
     private static int u8(byte[] a, int i) { return a[i] & 0xFF; }
     private static int u16(byte[] a, int i) { return ((a[i] & 0xFF) << 8) | (a[i + 1] & 0xFF); }
     private static int u32(byte[] a, int i)
