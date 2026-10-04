@@ -68,6 +68,8 @@ public class SecondScreenMenuActivity extends Activity
     private View mTopBar;
     private TextView mHint;
     private FrameLayout mMenuContainer;
+    private FrameLayout mInfoContainer;
+    private View mInfoPanel;
     private boolean mMenuOpen = false;
     private boolean mFinishingByHost = false;
     private boolean mShown = false;
@@ -161,6 +163,12 @@ public class SecondScreenMenuActivity extends Activity
         column.addView(mMenuContainer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
+        // In-game live info (e.g. Banjo-Tooie stats), shown instead of the menu while playing
+        mInfoContainer = new FrameLayout(ctx);
+        mInfoContainer.setVisibility(View.GONE);
+        column.addView(mInfoContainer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
         // In-game only: which screen the controller buttons drive right now
         TextView hint = new TextView(ctx);
         hint.setTextColor(0xFFDDDDDD);
@@ -169,6 +177,10 @@ public class SecondScreenMenuActivity extends Activity
         hint.setPadding(pad, pad / 2, pad, pad / 2);
         hint.setBackgroundColor(0xFF202020);
         hint.setVisibility(inGame ? View.VISIBLE : View.GONE);
+        hint.setClickable(true);
+        hint.setOnClickListener(v -> {
+            if (mHost != null) mHost.toggleControllerTarget();
+        });
         mHint = hint;
         column.addView(hint, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -197,6 +209,43 @@ public class SecondScreenMenuActivity extends Activity
             ((ViewGroup) mMenuView.getParent()).removeView(mMenuView);
         }
         mMenuView = null;
+    }
+
+    private void detachInfoPanel()
+    {
+        if (mInfoPanel != null && mInfoPanel.getParent() instanceof ViewGroup) {
+            ((ViewGroup) mInfoPanel.getParent()).removeView(mInfoPanel);
+        }
+        mInfoPanel = null;
+    }
+
+    /** Put (or, with null, remove) the host's live info panel. */
+    void attachInfoPanel(View panel)
+    {
+        if (mInfoContainer == null) return;
+        if (panel == mInfoPanel && (panel == null || panel.getParent() == mInfoContainer)) return;
+        if (mInfoPanel != null && mInfoPanel.getParent() instanceof ViewGroup) {
+            ((ViewGroup) mInfoPanel.getParent()).removeView(mInfoPanel);
+        }
+        mInfoPanel = panel;
+        if (panel != null) {
+            if (panel.getParent() instanceof ViewGroup) {
+                ((ViewGroup) panel.getParent()).removeView(panel);
+            }
+            mInfoContainer.addView(panel, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        } else {
+            showInfoPanel(false);
+        }
+    }
+
+    /** Show the info panel instead of the menu (only if there is one). */
+    void showInfoPanel(boolean show)
+    {
+        if (mInfoContainer == null) return;
+        boolean info = show && mInfoPanel != null;
+        mInfoContainer.setVisibility(info ? View.VISIBLE : View.GONE);
+        mMenuContainer.setVisibility(info ? View.GONE : View.VISIBLE);
     }
 
     void setMenuOpen(boolean open)
@@ -239,6 +288,7 @@ public class SecondScreenMenuActivity extends Activity
     {
         mFinishingByHost = true;
         detachMenu();
+        detachInfoPanel();
         mHost = null;
         finish();
     }
@@ -304,6 +354,7 @@ public class SecondScreenMenuActivity extends Activity
     protected void onDestroy()
     {
         detachMenu();
+        detachInfoPanel();
         DualScreenDrawerLayout host = mHost;
         mHost = null;
         if (host != null) {

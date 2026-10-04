@@ -46,6 +46,9 @@ public interface AeBridgeLibrary extends Library {
     // Unload library using dlclose
     int unloadLibrary(Pointer handle, String libName);
 
+    // Copy N64 RDRAM bytes (big-endian order) into out; returns the number of bytes copied
+    int aeReadRdram(int address, byte[] out, int length);
+
     // RetroAchievements: create rc_client and log in with a saved API token
     void rcheevosInit(String username, String token);
 

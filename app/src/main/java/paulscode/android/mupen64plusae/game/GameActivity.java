@@ -455,6 +455,12 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         // On dual-screen devices (e.g. AYN Thor) show the in-game menu on the second screen
         mDrawerLayout.setSecondScreenEnabled(mGlobalPrefs.inGameMenuOnSecondScreen);
 
+        // Banjo-Tooie (USA): live stats (health, collectibles, ammo) on the second screen
+        if (mDrawerLayout.isUsingSecondScreen() &&
+                BanjoTooieStats.isBanjoTooieUsa(mRomHeaderName, mRomCountryCode)) {
+            mDrawerLayout.setInfoPanel(new BanjoTooieStatsView(this));
+        }
+
         if (!TextUtils.isEmpty(mRomArtPath) && new File(mRomArtPath).exists() && FileUtil.isFileImage(new File(mRomArtPath)))
             mGameSidebar.setImage(new BitmapDrawable(this.getResources(), mRomArtPath));
 

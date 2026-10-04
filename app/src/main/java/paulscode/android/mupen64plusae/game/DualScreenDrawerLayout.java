@@ -102,6 +102,8 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private boolean mBypassForwarding = false;
     /** Back/Menu down was used to toggle the controller; swallow the matching up. */
     private boolean mSwallowToggleUp = false;
+    /** In-game only: optional live info (e.g. Banjo-Tooie stats) shown instead of the menu. */
+    private View mInfoPanel;
     private DisplayManager mDisplayManager;
 
     /** Fires if the menu screen didn't come up after we asked Android to open it. */
@@ -185,6 +187,16 @@ public class DualScreenDrawerLayout extends DrawerLayout
             mDisplayManager.unregisterDisplayListener(mDisplayListener);
             leaveSecondScreenMode();
         }
+    }
+
+    /**
+     * In-game: show this view on the second screen while playing, instead of the menu. Back/Menu
+     * (or tapping the hint line) switches between it and the menu.
+     */
+    public void setInfoPanel(View panel)
+    {
+        mInfoPanel = panel;
+        if (mMenuScreen != null && mHostVisible) syncMenuScreen();
     }
 
     /** True while the menu lives on the second screen. */
@@ -320,10 +332,12 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (mMenuScreen == null) return;
         if (mHostVisible) {
             mMenuScreen.attachMenu(mDrawerView);
+            mMenuScreen.attachInfoPanel(mInGame ? mInfoPanel : null);
             mMenuScreen.setMenuOpen(mMenuOpen);
             updateControllerHint();
         } else {
             mMenuScreen.detachMenu();
+            mMenuScreen.attachInfoPanel(null);
         }
     }
 
@@ -593,12 +607,8 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             if (event.getRepeatCount() == 0) {
-                mControllerOnMenu = !mControllerOnMenu;
                 mSwallowToggleUp = true;
-                if (mMenuScreen != null) {
-                    updateControllerHint();
-                    if (mControllerOnMenu) mMenuScreen.focusMenuForController();
-                }
+                toggleControllerTarget();
             }
             return true;
         }
@@ -611,7 +621,18 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
     private void updateControllerHint()
     {
-        if (mMenuScreen != null) mMenuScreen.showControllerHint(mInGame, mControllerOnMenu);
+        if (mMenuScreen == null) return;
+        mMenuScreen.showControllerHint(mInGame, mControllerOnMenu);
+        mMenuScreen.showInfoPanel(mInGame && !mControllerOnMenu);
+    }
+
+    /** In-game: the hint line was tapped; same as pressing Back/Menu. */
+    void toggleControllerTarget()
+    {
+        if (!mInGame) return;
+        mControllerOnMenu = !mControllerOnMenu;
+        updateControllerHint();
+        if (mControllerOnMenu && mMenuScreen != null) mMenuScreen.focusMenuForController();
     }
 
     /** Keys arriving at this (main screen) window. */
