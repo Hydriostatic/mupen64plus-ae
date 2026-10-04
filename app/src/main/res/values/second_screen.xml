@@ -1,10 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Second screen (e.g. AYN Thor bottom screen): grey, never blank -->
-    <color name="second_screen_grey">#FF303030</color>
+    <!-- Second screen (e.g. AYN Thor bottom screen): never blank -->
+    <color name="second_screen_grey">#FF0D1116</color>
 
     <style name="Theme.SecondScreen" parent="@android:style/Theme.Black.NoTitleBar.Fullscreen">
         <item name="android:windowBackground">@color/second_screen_grey</item>
         <item name="android:colorBackground">@color/second_screen_grey</item>
+    </style>
+
+    <!-- Titles of the library / recently played panes on the main screen -->
+    <style name="SplitPaneTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingLeft">25dp</item>
+        <item name="android:paddingTop">14dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:textSize">14.5sp</item>
+        <item name="android:letterSpacing">0.1</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/mupen_white</item>
     </style>
 </resources>

@@ -44,6 +44,91 @@
             android:background="@color/mupen_black"
             />
 
+        <!-- Dual-screen devices (AYN Thor): the library on the left, recently played on the right.
+             The search bar is hidden there; all menus are on the second screen. -->
+        <LinearLayout
+            android:id="@+id/splitLibrary"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:background="@color/mupen_black"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/splitLibraryPane"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.62"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/splitLibraryTitle"
+                    style="@style/SplitPaneTitle"
+                    android:text="@string/galleryLibrary" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/libraryGrid"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:clipToPadding="false"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
+                    android:paddingBottom="24dp"
+                    app:fastScrollEnabled="true"
+                    app:fastScrollHorizontalThumbDrawable="@drawable/thumb_drawable"
+                    app:fastScrollHorizontalTrackDrawable="@drawable/line_drawable"
+                    app:fastScrollVerticalThumbDrawable="@drawable/thumb_drawable"
+                    app:fastScrollVerticalTrackDrawable="@drawable/line_drawable" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp"
+                android:background="#33FFFFFF" />
+
+            <LinearLayout
+                android:id="@+id/splitRecentPane"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.38"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/splitRecentTitle"
+                    style="@style/SplitPaneTitle"
+                    android:text="@string/galleryRecentlyPlayed" />
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recentGrid"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:paddingLeft="10dp"
+                        android:paddingRight="10dp"
+                        android:paddingBottom="24dp" />
+
+                    <TextView
+                        android:id="@+id/recentEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:gravity="center"
+                        android:padding="16dp"
+                        android:text="@string/galleryNoRecentGames"
+                        android:textColor="@color/gray3"
+                        android:visibility="gone" />
+                </FrameLayout>
+            </LinearLayout>
+        </LinearLayout>
+
         <ImageView
             android:id="@+id/gallery_empty_icon"
             android:layout_width="wrap_content"
@@ -53,6 +138,7 @@
             tools:ignore="ContentDescription" />
 
         <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:elevation="0dp"

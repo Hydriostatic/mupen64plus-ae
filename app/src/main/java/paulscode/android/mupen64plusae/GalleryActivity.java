@@ -131,6 +131,16 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
     private GameSidebar mDrawerList;
     private GameSidebar mGameSidebar;
 
+    // Dual-screen devices: library and recently played side by side, menus on the second screen
+    private boolean mSplitMode = false;
+    private View mSplitView;
+    private RecyclerView mLibraryGrid;
+    private RecyclerView mRecentGrid;
+    private View mRecentEmpty;
+    /** Covers only, no names under them (the cover already shows which game it is). */
+    public boolean hideGameNames = false;
+    private static final float SPLIT_LIBRARY_WEIGHT = 0.62f;
+
     // Searching
     private SearchView mSearchView;
     private String mSearchQuery = "";
@@ -442,7 +452,8 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
                 // Hide the game information sidebar
                 mDrawerList.setVisibility( View.VISIBLE );
                 mGameSidebar.setVisibility( View.GONE );
-                mGridView.requestFocus();
+                if (mSplitMode) mLibraryGrid.requestFocus();
+                else mGridView.requestFocus();
 
                 if(mGridView.getAdapter() != null && mGridView.getAdapter().getItemCount() != 0)
                 {
@@ -506,6 +517,13 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
         // window, so they can't be found here afterwards.
         mDrawerLayout.setSecondScreenEnabled(mGlobalPrefs.inGameMenuOnSecondScreen, true,
                 SecondScreenAppMenuActivity.class);
+
+        // With the menus on the second screen, this screen is only the game list
+        mSplitView = findViewById(R.id.splitLibrary);
+        mLibraryGrid = findViewById(R.id.libraryGrid);
+        mRecentGrid = findViewById(R.id.recentGrid);
+        mRecentEmpty = findViewById(R.id.recentEmpty);
+        mDrawerLayout.setOnSecondScreenModeChangedListener(this::setSplitMode);
 
         // find the retained fragment on activity restarts
         final FragmentManager fm = getSupportFragmentManager();
@@ -1126,8 +1144,87 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
         runOnUiThread(() -> refreshGrid(mItemsCache, mRecentItemsCache));
     }
 
+    /**
+     * Dual-screen layout on or off: library and recently played side by side, no search bar or
+     * menu button (the menus are on the second screen), and no names under the covers.
+     */
+    private void setSplitMode(boolean on)
+    {
+        if (mSplitView == null || mLibraryGrid == null || mRecentGrid == null) on = false;
+        boolean changed = on != mSplitMode;
+        mSplitMode = on;
+        hideGameNames = on;
+
+        View appBar = findViewById(R.id.appBar);
+        if (appBar != null) appBar.setVisibility(on ? View.GONE : View.VISIBLE);
+        mGridView.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (mSplitView != null) mSplitView.setVisibility(on ? View.VISIBLE : View.GONE);
+
+        if (changed && mDrawerLayout.getWidth() > 0) {
+            refreshGrid(mItemsCache, mRecentItemsCache);
+        }
+    }
+
+    private void refreshSplitGrid(List<GalleryItem> items, List<GalleryItem> recentItems)
+    {
+        galleryMaxWidth = (int) (getResources().getDimension( R.dimen.galleryImageWidth ) * mGlobalPrefs.coverArtScale);
+        galleryHalfSpacing = (int) getResources().getDimension( R.dimen.galleryHalfSpacing );
+        galleryAspectRatio = galleryMaxWidth * 1.0f
+                / getResources().getDimension( R.dimen.galleryImageHeight )/mGlobalPrefs.coverArtScale;
+
+        // Pane widths, from the weights in the layout (the panes may not be laid out yet)
+        int total = mSplitView.getWidth() > 0 ? mSplitView.getWidth() : mDrawerLayout.getWidth();
+        int libraryPane = Math.round(total * SPLIT_LIBRARY_WEIGHT);
+        int recentPane = total - libraryPane;
+
+        int width = libraryPane - mLibraryGrid.getPaddingLeft() - mLibraryGrid.getPaddingRight();
+        width = Math.max(width, galleryHalfSpacing*4);
+        int libraryColumns = (int) Math.ceil( width * 1.0 / ( galleryMaxWidth + galleryHalfSpacing * 2 ) );
+        galleryColumns = libraryColumns;
+        galleryWidth = width / libraryColumns - galleryHalfSpacing * 2;
+
+        int recentWidth = recentPane - mRecentGrid.getPaddingLeft() - mRecentGrid.getPaddingRight();
+        int recentColumns = Math.max(1, recentWidth / ( galleryWidth + galleryHalfSpacing * 2 ));
+
+        mLibraryGrid.setLayoutManager( new GridLayoutManager( this, libraryColumns ) );
+        mLibraryGrid.setFocusable(false);
+        mLibraryGrid.setFocusableInTouchMode(false);
+        mLibraryGrid.setAdapter( new GalleryItem.Adapter( this, items ) );
+
+        mRecentGrid.setLayoutManager( new GridLayoutManager( this, recentColumns ) );
+        mRecentGrid.setFocusable(false);
+        mRecentGrid.setFocusableInTouchMode(false);
+        mRecentGrid.setAdapter( new GalleryItem.Adapter( this, recentItems ) );
+        if (mRecentEmpty != null) {
+            mRecentEmpty.setVisibility(recentItems.isEmpty() ? View.VISIBLE : View.GONE);
+        }
+
+        if (mSelectedItem != null) {
+            // Repopulate the game sidebar
+            for (final GalleryItem item : items) {
+                if (mSelectedItem.md5.equals( item.md5 )) {
+                    onGalleryItemClick( item );
+                    break;
+                }
+            }
+        }
+
+        findViewById(R.id.gallery_empty_icon).setVisibility(items.isEmpty() ? View.VISIBLE : View.INVISIBLE);
+        mCurrentVisiblePosition = 0;
+
+        // We were asked to launch a game after a scan completes, so do it here
+        if (!TextUtils.isEmpty(mLaunchGameAfterScan)) {
+            launchGameOnCreation(mLaunchGameAfterScan, false);
+        }
+    }
+
     synchronized void refreshGrid(List<GalleryItem> items, List<GalleryItem> recentItems)
     {
+        if (mSplitMode) {
+            refreshSplitGrid(items, recentItems);
+            return;
+        }
+
         if( mGlobalPrefs.isRecentShown && TextUtils.isEmpty(mSearchQuery) && recentItems.size() > 0 )
         {
             List<GalleryItem> combinedItems = new ArrayList<>();

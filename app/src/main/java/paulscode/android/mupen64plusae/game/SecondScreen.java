@@ -18,15 +18,22 @@ package paulscode.android.mupen64plusae.game;
 
 import android.app.Activity;
 import android.app.ActivityOptions;
+import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.display.DisplayManager;
+import android.os.Bundle;
 import android.util.Log;
 import android.view.Display;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Dual-screen support (e.g. AYN Thor): the main display shows the game list and the game, while
@@ -40,6 +47,78 @@ public final class SecondScreen
     public static final String PREF_KEY = "inGameMenuSecondScreen";
 
     private SecondScreen() {}
+
+    // ---------------------------------------------------------------------------------------------
+    // Which of this process's screens are showing, so the second screen is never left empty
+    // ---------------------------------------------------------------------------------------------
+
+    private static boolean sTracking = false;
+    /** Started activities of this process, except the second-screen menu hosts. */
+    private static final Set<Activity> sStartedPages = new HashSet<>();
+    private static final List<Runnable> sPageStoppedListeners = new ArrayList<>();
+
+    /** Start keeping track of this process's visible screens. Safe to call more than once. */
+    static void track(@NonNull Context context)
+    {
+        if (sTracking) return;
+        Application app = (Application) context.getApplicationContext();
+        if (app == null) return;
+        sTracking = true;
+        app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityCreated(@NonNull Activity a, @Nullable Bundle b) {}
+            @Override public void onActivityResumed(@NonNull Activity a) {}
+            @Override public void onActivityPaused(@NonNull Activity a) {}
+            @Override public void onActivitySaveInstanceState(@NonNull Activity a, @NonNull Bundle b) {}
+
+            @Override public void onActivityStarted(@NonNull Activity a)
+            {
+                if (!(a instanceof SecondScreenMenuActivity)) sStartedPages.add(a);
+            }
+
+            @Override public void onActivityStopped(@NonNull Activity a)
+            {
+                if (sStartedPages.remove(a) || a instanceof SecondScreenMenuActivity) notifyStopped();
+            }
+
+            @Override public void onActivityDestroyed(@NonNull Activity a)
+            {
+                if (sStartedPages.remove(a)) notifyStopped();
+            }
+        });
+    }
+
+    private static void notifyStopped()
+    {
+        for (Runnable r : new ArrayList<>(sPageStoppedListeners)) r.run();
+    }
+
+    static void addPageStoppedListener(@NonNull Runnable listener)
+    {
+        if (!sPageStoppedListeners.contains(listener)) sPageStoppedListeners.add(listener);
+    }
+
+    static void removePageStoppedListener(@NonNull Runnable listener)
+    {
+        sPageStoppedListeners.remove(listener);
+    }
+
+    /** True if one of this process's pages (not the menu host) is showing on that display. */
+    static boolean isPageShownOn(int displayId)
+    {
+        for (Activity a : sStartedPages) {
+            if (!a.isFinishing() && displayOf(a) == displayId) return true;
+        }
+        return false;
+    }
+
+    /** True if any page of this process (other than the menu hosts) is showing anywhere. */
+    static boolean isAnyPageShown()
+    {
+        for (Activity a : sStartedPages) {
+            if (!a.isFinishing()) return true;
+        }
+        return false;
+    }
 
     public static boolean isEnabled(@NonNull Context context)
     {

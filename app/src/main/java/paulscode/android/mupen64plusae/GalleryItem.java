@@ -105,6 +105,16 @@ public class GalleryItem
         this.scale = 1.0f;
     }
     
+    private Boolean mHasArt = null;
+
+    /** True if this game has its own cover art (not the default picture). */
+    boolean hasArt()
+    {
+        if( mHasArt == null )
+            mHasArt = !TextUtils.isEmpty( artPath ) && new File( artPath ).exists();
+        return mHasArt;
+    }
+
     void loadBitmap(Context context)
     {
         if( artBitmap != null )
@@ -298,6 +308,10 @@ public class GalleryItem
                         LinearLayout layout = view.findViewById( R.id.info );
                         layout.getLayoutParams().width = activity.galleryWidth;
                         layout.getLayoutParams().height = (int)(activity.getResources().getDimension( R.dimen.galleryTextHeight )*item.scale);
+
+                        // Dual-screen layout: just the cover, unless there's no cover to tell
+                        // the game by
+                        layout.setVisibility( activity.hideGameNames && item.hasArt() ? View.GONE : View.VISIBLE );
                     }
                 }
             }

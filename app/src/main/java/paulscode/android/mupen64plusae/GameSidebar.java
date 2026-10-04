@@ -35,6 +35,9 @@ public class GameSidebar extends MenuListView
     private TextView mGameTitle;
     private GameSidebarActionHandler mActionHandler;
     private View mHeader;
+    private boolean mHeaderShown = true;
+    private boolean mHeaderIsLogo = false;
+    private Runnable mHeaderChangedListener;
 
     public GameSidebar( Context context, AttributeSet attrs) {
         super( context, attrs );
@@ -72,10 +75,52 @@ public class GameSidebar extends MenuListView
         }
         else
             mInfoArt.setImageResource( R.drawable.default_coverart );
+        mHeaderIsLogo = false;
+        notifyHeaderChanged();
     }
 
+    /** An app logo (rather than a game's cover art) as the header image. */
     public void setImage(int resourceId) {
         mInfoArt.setImageResource(resourceId);
+        mHeaderIsLogo = true;
+        notifyHeaderChanged();
+    }
+
+    /**
+     * Show or hide the header (image and title) at the top of the list. The second screen hides
+     * it and shows the image in a fixed band above the list instead.
+     */
+    public void setHeaderShown( boolean shown )
+    {
+        if( shown == mHeaderShown ) return;
+        mHeaderShown = shown;
+        if( shown )
+            addHeaderView( mHeader, null, false );
+        else
+            removeHeaderView( mHeader );
+    }
+
+    /** The header image (cover art, or the app logo). */
+    public android.graphics.drawable.Drawable getHeaderImage()
+    {
+        return mInfoArt.getDrawable();
+    }
+
+    /** True if the header image is the app logo, false if it is a game's cover art. */
+    public boolean isHeaderImageLogo()
+    {
+        return mHeaderIsLogo;
+    }
+
+    /** Called whenever the header image changes. */
+    public void setOnHeaderChangedListener( Runnable listener )
+    {
+        mHeaderChangedListener = listener;
+    }
+
+    private void notifyHeaderChanged()
+    {
+        if( mHeaderChangedListener != null ) mHeaderChangedListener.run();
     }
     
     public void setTitle( String title )

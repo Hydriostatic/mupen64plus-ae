@@ -396,6 +396,7 @@
     <string name="secondScreenMenu_paused">Pausado</string>
     <string name="secondScreenMenu_hintOnGame">Os botões controlam o jogo · aperte Voltar para usar o menu</string>
     <string name="secondScreenMenu_hintOnMenu">Os botões controlam o menu · aperte Voltar para voltar ao jogo</string>
+    <string name="galleryNoRecentGames">Nenhum jogo jogado ainda</string>
     <string name="secondScreenMenu_back">Voltar</string>
     <string name="secondScreenMenu_resume">Voltar ao jogo</string>
     <string name="secondScreenMenu_tapToOpen">Toque para pausar e abrir o menu</string>

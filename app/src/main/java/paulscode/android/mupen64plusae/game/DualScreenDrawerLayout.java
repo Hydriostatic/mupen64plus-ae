@@ -59,8 +59,9 @@ import java.util.List;
  * </ul>
  *
  * The second screen never goes blank while the app is in use: when there is no menu to show
- * (e.g. while a game is starting) it shows a plain grey screen. It is closed only when the user
- * leaves the app.
+ * (e.g. while a game is starting) it shows its plain background. It can't be closed from the
+ * second screen (Back never closes it, and if Android closes it or covers it with something
+ * else it is brought straight back); it is closed only when the user leaves the app.
  *
  * If no usable second display is present, or it goes away, the classic side drawer is used.
  */
@@ -104,6 +105,26 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private boolean mSwallowToggleUp = false;
     private DisplayManager mDisplayManager;
 
+    /** Times the menu screen had to be reopened recently, to give up if Android keeps refusing. */
+    private final long[] mRelaunchTimes = new long[4];
+    private int mRelaunchIndex = 0;
+    private long mLastBringToFront = 0;
+
+    /** Told when the menus move to the second screen or back to the side drawer. */
+    public interface OnSecondScreenModeChangedListener
+    {
+        void onSecondScreenModeChanged(boolean usingSecondScreen);
+    }
+
+    private OnSecondScreenModeChangedListener mModeListener;
+
+    /** Something on the second screen was closed or covered: make sure the menu is in front. */
+    private final Runnable mEnsureMenuInFront = this::ensureMenuScreenInFront;
+    private final Runnable mOnPageStopped = () -> {
+        mHandler.removeCallbacks(mEnsureMenuInFront);
+        mHandler.postDelayed(mEnsureMenuInFront, 500);
+    };
+
     /** Fires if the menu screen didn't come up after we asked Android to open it. */
     private final Runnable mLaunchTimeout = () -> {
         if (mLaunchPending && mMenuScreen == null && mSecondScreenActive) {
@@ -114,7 +135,9 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
     /** Closes the grey second screen once it's clear the user has left the app. */
     private final Runnable mLeftAppCheck = () -> {
-        if (!mHostVisible && mMenuScreen != null && mMenuScreen.isShownToUser()) {
+        // Still in the app if one of its pages covers this one (e.g. the ROM scanner)
+        if (!mHostVisible && mMenuScreen != null && mMenuScreen.isShownToUser() &&
+                !SecondScreen.isAnyPageShown()) {
             Log.i(TAG, "App left; closing second screen");
             finishMenuScreen();
         }
@@ -179,12 +202,26 @@ public class DualScreenDrawerLayout extends DrawerLayout
         }
 
         if (enabled) {
+            SecondScreen.track(getContext());
+            SecondScreen.addPageStoppedListener(mOnPageStopped);
             mDisplayManager.registerDisplayListener(mDisplayListener, mHandler);
             enterSecondScreenMode(true);
         } else {
+            SecondScreen.removePageStoppedListener(mOnPageStopped);
             mDisplayManager.unregisterDisplayListener(mDisplayListener);
             leaveSecondScreenMode();
         }
+    }
+
+    public void setOnSecondScreenModeChangedListener(@Nullable OnSecondScreenModeChangedListener listener)
+    {
+        mModeListener = listener;
+        if (listener != null) listener.onSecondScreenModeChanged(mSecondScreenActive);
+    }
+
+    private void notifyModeChanged()
+    {
+        if (mModeListener != null) mModeListener.onSecondScreenModeChanged(mSecondScreenActive);
     }
 
     /** True while the menu lives on the second screen. */
@@ -243,6 +280,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
         mControllerOnMenu = false;
 
         launchMenuScreen();
+        notifyModeChanged();
     }
 
     private void leaveSecondScreenMode()
@@ -271,6 +309,57 @@ public class DualScreenDrawerLayout extends DrawerLayout
             // Re-open as a regular drawer; DrawerLayout will notify the listeners itself
             post(() -> super.openDrawer(Gravity.START));
         }
+        notifyModeChanged();
+    }
+
+    /**
+     * Keep the menu up on the second screen while this window is showing: reopen it if it was
+     * closed, and bring it back in front if something else took over that screen (but not over
+     * one of our own pages that was opened there, like a settings page).
+     */
+    private void ensureMenuScreenInFront()
+    {
+        if (!mSecondScreenActive || !mHostVisible || mLaunchPending) return;
+        Activity activity = getActivity();
+        if (activity == null || activity.isFinishing()) return;
+
+        if (mMenuScreen == null) {
+            launchMenuScreen();
+            return;
+        }
+        if (mMenuScreen.isStartedState() || SecondScreen.isPageShownOn(mTargetDisplayId)) return;
+
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - mLastBringToFront < 1000) {
+            mHandler.removeCallbacks(mEnsureMenuInFront);
+            mHandler.postDelayed(mEnsureMenuInFront, 1000);
+            return;
+        }
+        mLastBringToFront = now;
+
+        Log.i(TAG, "Second screen was covered; bringing the menu back");
+        Intent intent = new Intent(activity, mMenuActivityClass);
+        intent.putExtra(SecondScreenMenuActivity.EXTRA_DISPLAY_ID, mTargetDisplayId);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION |
+                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        ActivityOptions options = ActivityOptions.makeBasic();
+        options.setLaunchDisplayId(mTargetDisplayId);
+        try {
+            activity.startActivity(intent, options.toBundle());
+        } catch (Exception e) {
+            Log.w(TAG, "Couldn't bring the menu back on display " + mTargetDisplayId, e);
+        }
+    }
+
+    /** Returns false if the menu screen has been reopened too often in a short time. */
+    private boolean allowRelaunch()
+    {
+        long now = android.os.SystemClock.uptimeMillis();
+        long oldest = mRelaunchTimes[mRelaunchIndex];
+        if (oldest != 0 && now - oldest < 10000) return false;
+        mRelaunchTimes[mRelaunchIndex] = now;
+        mRelaunchIndex = (mRelaunchIndex + 1) % mRelaunchTimes.length;
+        return true;
     }
 
     private void launchMenuScreen()
@@ -362,10 +451,45 @@ public class DualScreenDrawerLayout extends DrawerLayout
         mMenuScreen = null;
 
         if (!expected && mSecondScreenActive) {
-            // Closed by the system or the user from the other screen: go back to the side drawer
-            Log.i(TAG, "Second screen menu was closed, using the side drawer");
-            status("menu screen was closed by the system, using side menu");
-            leaveSecondScreenMode();
+            if (allowRelaunch()) {
+                // The two screens belong together: reopen it right away (or as soon as this
+                // window shows again)
+                Log.i(TAG, "Second screen menu was closed; reopening it");
+                status("menu screen was closed, reopening");
+                mHandler.removeCallbacks(mEnsureMenuInFront);
+                mHandler.postDelayed(mEnsureMenuInFront, 300);
+            } else {
+                // Android keeps closing it: go back to the side drawer
+                Log.i(TAG, "Second screen menu keeps closing, using the side drawer");
+                status("menu screen keeps closing, using side menu");
+                leaveSecondScreenMode();
+            }
+        }
+    }
+
+    /** The menu screen went into the background (e.g. something else opened on that screen). */
+    void onMenuScreenStopped(SecondScreenMenuActivity screen)
+    {
+        if (screen != mMenuScreen) return;
+        mHandler.removeCallbacks(mEnsureMenuInFront);
+        mHandler.postDelayed(mEnsureMenuInFront, 500);
+    }
+
+    /**
+     * Back from the second screen's system back handling (gesture/predictive back, where no Back
+     * key arrives): the same as the Back key, and never closes the second screen.
+     */
+    void onBackFromMenuScreen()
+    {
+        if (mInGame) {
+            long now = android.os.SystemClock.uptimeMillis();
+            handleInGameToggle(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0));
+            handleInGameToggle(new KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK, 0));
+            return;
+        }
+        Activity activity = getActivity();
+        if (activity instanceof androidx.activity.ComponentActivity) {
+            ((androidx.activity.ComponentActivity) activity).getOnBackPressedDispatcher().onBackPressed();
         }
     }
 
@@ -442,7 +566,10 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (mHostVisible) {
             mHandler.removeCallbacks(mLeftAppCheck);
             if (mMenuScreen == null) launchMenuScreen();
-            else syncMenuScreen();
+            else {
+                syncMenuScreen();
+                mOnPageStopped.run();
+            }
         } else {
             // Another screen of ours (e.g. the game) or the home screen covers this window:
             // keep the second screen, grey, until we know which
@@ -460,6 +587,8 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (mDisplayManager != null) {
             mDisplayManager.unregisterDisplayListener(mDisplayListener);
         }
+        SecondScreen.removePageStoppedListener(mOnPageStopped);
+        mHandler.removeCallbacks(mEnsureMenuInFront);
         finishMenuScreen();
         super.onDetachedFromWindow();
     }
