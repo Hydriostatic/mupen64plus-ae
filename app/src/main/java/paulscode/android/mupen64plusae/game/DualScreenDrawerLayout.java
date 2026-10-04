@@ -350,27 +350,10 @@ public class DualScreenDrawerLayout extends DrawerLayout
     @Nullable
     private Display findSecondaryDisplay(@NonNull Activity activity)
     {
-        if (mDisplayManager == null) return null;
-
-        @SuppressWarnings("deprecation")
-        int ownDisplayId = activity.getWindowManager().getDefaultDisplay().getDisplayId();
-
-        Display fallback = null;
-        for (Display d : mDisplayManager.getDisplays()) {
-            if (d.getDisplayId() == ownDisplayId || !d.isValid()) continue;
-            if ((d.getFlags() & Display.FLAG_PRIVATE) != 0) continue;
-            // Prefer built-in panels (like the Thor's bottom screen) over cast/HDMI displays
-            if ((d.getFlags() & Display.FLAG_PRESENTATION) == 0) return d;
-            if (fallback == null) fallback = d;
-        }
-        if (fallback != null) return fallback;
-
-        // The game may be running on a secondary display itself; then use the main one
-        if (ownDisplayId != Display.DEFAULT_DISPLAY) {
-            Display main = mDisplayManager.getDisplay(Display.DEFAULT_DISPLAY);
-            if (main != null && main.isValid()) return main;
-        }
-        return null;
+        Display target = SecondScreen.findMenuDisplay(activity);
+        // Nothing to move if this screen already is the menu screen
+        if (target == null || target.getDisplayId() == SecondScreen.displayOf(activity)) return null;
+        return target;
     }
 
     private String describeDisplays(@NonNull Activity activity)

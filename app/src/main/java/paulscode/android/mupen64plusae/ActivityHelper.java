@@ -35,6 +35,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import paulscode.android.mupen64plusae.game.SecondScreen;
 import paulscode.android.mupen64plusae.game.GameActivity;
 import paulscode.android.mupen64plusae.input.DiagnosticActivity;
 import paulscode.android.mupen64plusae.jni.CoreService;
@@ -222,61 +223,61 @@ public class ActivityHelper
     static void startAudioPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, AudioPrefsActivity.class );
-        context.startActivity( intent );    
+        SecondScreen.startActivity( context, intent );    
     }
     
     static void startDataPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, DataPrefsActivity.class );
-        context.startActivity( intent );    
+        SecondScreen.startActivity( context, intent );    
     }
 
     static void startNetplayPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, NetplayPrefsActivity.class );
-        context.startActivity( intent );
+        SecondScreen.startActivity( context, intent );
     }
 
     static void startRetroAchievementsPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, RetroAchievementsPrefsActivity.class );
-        context.startActivity( intent );
+        SecondScreen.startActivity( context, intent );
     }
     
     static void startDisplayPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, DisplayPrefsActivity.class );
-        context.startActivity( intent );    
+        SecondScreen.startActivity( context, intent );    
     }
 
     static void startShadersPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, ShaderPrefsActivity.class );
-        context.startActivity( intent );
+        SecondScreen.startActivity( context, intent );
     }
     
     static void startInputPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, InputPrefsActivity.class );
-        context.startActivity( intent );    
+        SecondScreen.startActivity( context, intent );    
     }
 
     static void startDefaultPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, DefaultsPrefsActivity.class );
-        context.startActivity( intent );
+        SecondScreen.startActivity( context, intent );
     }
     
     static void startLibraryPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, LibraryPrefsActivity.class );
-        context.startActivity( intent );    
+        SecondScreen.startActivity( context, intent );    
     }
     
     public static void startTouchscreenPrefsActivity( Context context )
     {
         Intent intent = new Intent( context, TouchscreenPrefsActivity.class );
-        context.startActivity( intent );    
+        SecondScreen.startActivity( context, intent );    
     }
     
     static void startGamePrefsActivity( Context context, String romPath, String romMd5,
@@ -291,38 +292,38 @@ public class ActivityHelper
         intent.putExtra( Keys.ROM_GOOD_NAME, romGoodName );
         intent.putExtra( Keys.ROM_DISPLAY_NAME, romDisplayName );
         intent.putExtra( Keys.ROM_COUNTRY_CODE, romCountryCode );
-        context.startActivity( intent );
+        SecondScreen.startActivity( context, intent );
     }
     
     static void startManageEmulationProfilesActivity( Context context )
     {
-        context.startActivity( new Intent( context, ManageEmulationProfilesActivity.class ) );
+        SecondScreen.startActivity( context, new Intent( context, ManageEmulationProfilesActivity.class ) );
     }
     
     static void startManageTouchscreenProfilesActivity( Context context )
     {
-        context.startActivity( new Intent( context, ManageTouchscreenProfilesActivity.class ) );
+        SecondScreen.startActivity( context, new Intent( context, ManageTouchscreenProfilesActivity.class ) );
     }
     
     static void startManageControllerProfilesActivity( Context context )
     {
-        context.startActivity( new Intent( context, ManageControllerProfilesActivity.class ) );
+        SecondScreen.startActivity( context, new Intent( context, ManageControllerProfilesActivity.class ) );
     }
 
     public static void startImportExportActivity( Context context )
     {
         Intent intent = new Intent( context, ImportExportActivity.class );
-        context.startActivity( intent );
+        SecondScreen.startActivity( context, intent );
     }
     
     static void startDiagnosticActivity( Context context )
     {
-        context.startActivity( new Intent( context, DiagnosticActivity.class ) );
+        SecondScreen.startActivity( context, new Intent( context, DiagnosticActivity.class ) );
     }
 
     static void startLogcatActivity( Context context )
     {
-        context.startActivity( new Intent( context, LogcatActivity.class) );
+        SecondScreen.startActivity( context, new Intent( context, LogcatActivity.class) );
     }
     
     static void startCacheRomInfoService(Context context, ServiceConnection serviceConnection,
@@ -399,13 +400,13 @@ public class ActivityHelper
     static void starExtractTextureActivity(Activity activity)
     {
         Intent intent = new Intent(activity, ExtractTexturesActivity.class);
-        activity.startActivity( intent );
+        SecondScreen.startActivity( activity, intent );
     }
 
     static void startDeleteTextureActivity(Activity activity)
     {
         Intent intent = new Intent(activity, DeleteTexturesActivity.class);
-        activity.startActivity( intent );
+        SecondScreen.startActivity( activity, intent );
     }
 
     public static void startCoreService(Context context, ServiceConnection serviceConnection, StartCoreServiceParams params)
