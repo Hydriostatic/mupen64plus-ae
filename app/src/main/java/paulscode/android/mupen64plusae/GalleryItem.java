@@ -182,6 +182,11 @@ public class GalleryItem
             mActivity = activity;
             view.setOnClickListener( this );
             view.setOnLongClickListener( this );
+            view.setOnFocusChangeListener( (v, hasFocus) -> {
+                Context tempContext = mActivity.get();
+                if ( hasFocus && item != null && tempContext instanceof GalleryActivity )
+                    ( (GalleryActivity) tempContext ).onGalleryItemFocused( item, v );
+            } );
         }
         
         @NonNull

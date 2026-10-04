@@ -96,7 +96,7 @@ import paulscode.android.mupen64plusae.util.FileUtil;
 import paulscode.android.mupen64plusae.util.LocaleContextWrapper;
 import paulscode.android.mupen64plusae.util.Notifier;
 
-public class GalleryActivity extends AppCompatActivity implements GameSidebarActionHandler, PromptConfirmListener,
+public class GalleryActivity extends AppCompatActivity implements GameSidebarActionHandler, PromptConfirmListener, GameCardPanel.Host,
         GalleryRefreshFinishedListener
 {
     // Saved instance states
@@ -140,6 +140,11 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
     /** Covers only, no names under them (the cover already shows which game it is). */
     public boolean hideGameNames = false;
     private static final float SPLIT_LIBRARY_WEIGHT = 0.62f;
+
+    // BETA: the second screen as a card for the highlighted game, with tabs for the menus
+    private GameCardPanel mCardPanel;
+    private boolean mCardMode = false;
+    private View mLastFocusedGame;
 
     // Searching
     private SearchView mSearchView;
@@ -439,8 +444,7 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
                     {
                         // onDrawerClosed from dragging it
                         mDragging = false;
-                        mDrawerList.setVisibility( View.VISIBLE );
-                        mGameSidebar.setVisibility( View.GONE );
+                        showSidebars( false );
                         mSelectedItem = null;
                     }
                 }
@@ -450,9 +454,12 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
             public void onDrawerClosed( View drawerView )
             {
                 // Hide the game information sidebar
-                mDrawerList.setVisibility( View.VISIBLE );
-                mGameSidebar.setVisibility( View.GONE );
-                if (mSplitMode) mLibraryGrid.requestFocus();
+                showSidebars( false );
+                if (mSplitMode) {
+                    // Back to the game that was highlighted, so the card keeps showing it
+                    if (mLastFocusedGame != null && mLastFocusedGame.isAttachedToWindow()) mLastFocusedGame.requestFocus();
+                    else mLibraryGrid.requestFocus();
+                }
                 else mGridView.requestFocus();
 
                 if(mGridView.getAdapter() != null && mGridView.getAdapter().getItemCount() != 0)
@@ -511,6 +518,9 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
 
         // Handle events from the side bar
         mGameSidebar.setActionHandler(this, R.menu.gallery_game_drawer);
+
+        mCardPanel = findViewById( R.id.gameCardPanel );
+        if (mCardPanel != null) mCardPanel.setHost(this);
 
         // On dual-screen devices (e.g. AYN Thor) keep the app menus on the second screen.
         // Must come after the findViewById calls above: it moves the drawer views out of this
@@ -637,8 +647,7 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
             mRefreshNeeded = false;
             reloadCacheAndRefreshGrid();
 
-            mGameSidebar.setVisibility( View.GONE );
-            mDrawerList.setVisibility( View.VISIBLE );
+            showSidebars( false );
         }
 
         // This is called here rather than onCreate otherwise onQueryTextChange is called on creation
@@ -1035,13 +1044,121 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
         }
     }
 
+    /** Show the main menu or a game's options in the drawer (or neither, with the game card). */
+    private void showSidebars( boolean game )
+    {
+        if (mCardMode) {
+            mDrawerList.setVisibility( View.GONE );
+            mGameSidebar.setVisibility( View.GONE );
+            return;
+        }
+        mDrawerList.setVisibility( game ? View.GONE : View.VISIBLE );
+        mGameSidebar.setVisibility( game ? View.VISIBLE : View.GONE );
+    }
+
+    /** A game was highlighted on this screen (controller or keyboard focus). */
+    void onGalleryItemFocused(GalleryItem item, View view)
+    {
+        if (!mCardMode || item == null || item.isHeading || item.romUri == null) return;
+        mLastFocusedGame = view;
+        if (!mDrawerLayout.isDrawerOpen( GravityCompat.START )) {
+            mCardPanel.showGame(item, true);
+        }
+    }
+
+    // GameCardPanel.Host --------------------------------------------------------------------------
+
+    @Override
+    public void onGameCardAction(@NonNull GalleryItem item, @NonNull MenuItem action)
+    {
+        mSelectedItem = item;
+        onGameSidebarAction(action);
+    }
+
+    @Override
+    public android.view.Menu getAppMenu()
+    {
+        return mDrawerList != null ? mDrawerList.getMenu() : null;
+    }
+
+    @Override
+    public boolean isAndroidTv()
+    {
+        return mAppData.isAndroidTv;
+    }
+
+    /** A game's settings for the card's tiles. Runs on a background thread. */
+    @NonNull
+    @Override
+    public GameCardPanel.Details loadDetails(@NonNull GalleryItem item)
+    {
+        GameCardPanel.Details details = new GameCardPanel.Details();
+        AppData appData = mAppData;
+        GlobalPrefs globalPrefs = mGlobalPrefs;
+        paulscode.android.mupen64plusae.persistent.GamePrefs prefs =
+                new paulscode.android.mupen64plusae.persistent.GamePrefs( this, item.md5, item.crc,
+                        item.headerName, item.goodName, item.countryCode.toString(), appData, globalPrefs );
+
+        if (prefs.emulationProfile != null) details.emulationProfile = prefs.emulationProfile.getName();
+        if (prefs.controllerProfile[0] != null) details.controllerProfile = prefs.controllerProfile[0].getName();
+
+        String video = prefs.videoPluginLib != null ? videoPluginName(prefs.videoPluginLib) : null;
+        int resolution = prefs.verticalRenderResolution > 0 ? prefs.verticalRenderResolution
+                : globalPrefs.displayResolution;
+        if (video != null && resolution > 0) video += " · " + resolution + "p";
+        details.video = video;
+        return details;
+    }
+
+    private static String videoPluginName(AppData.VideoPlugin plugin)
+    {
+        switch (plugin) {
+            case GLIDEN64: return "GLideN64";
+            case GLIDE64MK2:
+            case GLIDE64MK2_EGL: return "Glide64mk2";
+            case RICE: return "Rice";
+            case GLN64: return "gln64";
+            case ANGRYLION: return "Angrylion";
+            case PARALLEL: return "paraLLEl";
+            default: return plugin.name();
+        }
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event)
+    {
+        if (mCardMode && mCardPanel != null) {
+            // L1/R1: switch the second screen's tab; Start/Menu: hand it the controller
+            if (keyCode == KeyEvent.KEYCODE_BUTTON_L1 || keyCode == KeyEvent.KEYCODE_BUTTON_R1) {
+                if (event.getRepeatCount() == 0) {
+                    mCardPanel.switchTab(keyCode == KeyEvent.KEYCODE_BUTTON_L1 ? -1 : 1, false);
+                }
+                return true;
+            }
+            if ((keyCode == KeyEvent.KEYCODE_BUTTON_START || keyCode == KeyEvent.KEYCODE_MENU)
+                    && !mDrawerLayout.isDrawerOpen( GravityCompat.START )) {
+                mDrawerLayout.openDrawer( GravityCompat.START );
+                return true;
+            }
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
     public void onGalleryItemClick(GalleryItem item)
     {
+        if (mCardMode) {
+            // The card already shows the game; hand the controller to it, on its play button
+            mSelectedItem = item;
+            mCardPanel.showGameNow(item);
+            if (mDrawerLayout.isDrawerOpen( GravityCompat.START )) mCardPanel.focusDefault();
+            else mDrawerLayout.openDrawer( GravityCompat.START );
+            return;
+        }
+
         mSelectedItem = item;
 
         // Show the game info sidebar
-        mDrawerList.setVisibility(View.GONE);
-        mGameSidebar.setVisibility(View.VISIBLE);
+        showSidebars( true );
         mGameSidebar.scrollTo(0, 0);
 
         // Check if valid image
@@ -1154,6 +1271,11 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
         boolean changed = on != mSplitMode;
         mSplitMode = on;
         hideGameNames = on;
+
+        mCardMode = on && mCardPanel != null && androidx.preference.PreferenceManager
+                .getDefaultSharedPreferences(this).getBoolean("secondScreenGameCard", true);
+        if (mCardPanel != null) mCardPanel.setVisibility(mCardMode ? View.VISIBLE : View.GONE);
+        showSidebars(mGameSidebar.getVisibility() == View.VISIBLE);
 
         View appBar = findViewById(R.id.appBar);
         if (appBar != null) appBar.setVisibility(on ? View.GONE : View.VISIBLE);

@@ -244,6 +244,13 @@
             android:fillViewport="true"
             android:visibility="gone"
             style="@style/MupenTheme_Dark_Sidebar" />
+
+        <!-- BETA, second screen only: the highlighted game as a card, with tabs for the menus -->
+        <paulscode.android.mupen64plusae.GameCardPanel
+            android:id="@+id/gameCardPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
     </RelativeLayout>
 
 </paulscode.android.mupen64plusae.game.DualScreenDrawerLayout>

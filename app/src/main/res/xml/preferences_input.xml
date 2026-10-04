@@ -94,6 +94,13 @@
         android:title="@string/inGameMenuSecondScreen_title" />
 
     <androidx.preference.CheckBoxPreference
+        android:defaultValue="true"
+        android:dependency="inGameMenuSecondScreen"
+        android:key="secondScreenGameCard"
+        android:summary="@string/secondScreenGameCard_summary"
+        android:title="@string/secondScreenGameCard_title" />
+
+    <androidx.preference.CheckBoxPreference
         android:defaultValue="false"
         android:key="inputVolumeMappable"
         android:summary="@string/inputVolumeMappable_summary"

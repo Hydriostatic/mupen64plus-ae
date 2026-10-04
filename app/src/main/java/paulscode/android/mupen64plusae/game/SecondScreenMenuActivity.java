@@ -104,6 +104,7 @@ public class SecondScreenMenuActivity extends Activity
     private ScaledFrame mMenuContainer;
     private CropImageView mHeaderImage;
     private ImageView mHeaderBackdrop;
+    private View mHeaderBand;
     private boolean mMenuOpen = false;
     private boolean mFinishingByHost = false;
     private boolean mShown = false;
@@ -252,6 +253,7 @@ public class SecondScreenMenuActivity extends Activity
         chipLp.setMargins(pad, pad, pad, pad);
         header.addView(mBackChip, chipLp);
 
+        mHeaderBand = header;
         column.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, headerHeight));
 
@@ -356,6 +358,14 @@ public class SecondScreenMenuActivity extends Activity
     private void refreshHeader()
     {
         if (mHeaderImage == null) return;
+
+        // The game card (beta) has its own cover and tabs: it uses the whole screen
+        View card = visibleGameCard();
+        int bandVisibility = card != null ? View.GONE : View.VISIBLE;
+        if (mHeaderBand != null && mHeaderBand.getVisibility() != bandVisibility) {
+            mHeaderBand.setVisibility(bandVisibility);
+        }
+        if (card != null) return;
         GameSidebar sidebar = visibleSidebar();
         Drawable source = sidebar != null ? sidebar.getHeaderImage() : null;
         boolean isLogo = sidebar == null || sidebar.isHeaderImageLogo() || source == null;
@@ -416,6 +426,7 @@ public class SecondScreenMenuActivity extends Activity
         if (mHeaderImage != null) {
             mHeaderSource = null;
             showLogo();
+            if (mHeaderBand != null) mHeaderBand.setVisibility(View.VISIBLE);
         }
     }
 
@@ -476,10 +487,23 @@ public class SecondScreenMenuActivity extends Activity
         mHint.setBackgroundColor(controllerOnMenu ? 0xCC1E4A7A : 0x99000000);
     }
 
+    @Nullable
+    private View visibleGameCard()
+    {
+        if (mMenuView == null) return null;
+        View card = mMenuView.findViewById(R.id.gameCardPanel);
+        return card != null && card.getVisibility() == View.VISIBLE ? card : null;
+    }
+
     /** Give the menu list controller focus, with a visible highlight even after touches. */
     void focusMenuForController()
     {
         if (mMenuView == null) return;
+        View card = visibleGameCard();
+        if (card instanceof paulscode.android.mupen64plusae.GameCardPanel) {
+            ((paulscode.android.mupen64plusae.GameCardPanel) card).focusDefault();
+            return;
+        }
         View target = mMenuView.findViewById(R.id.gameSidebar);
         if (target == null || target.getVisibility() != View.VISIBLE) {
             target = mMenuView.findViewById(R.id.drawerNavigation);
