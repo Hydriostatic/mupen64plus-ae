@@ -22,10 +22,23 @@ android {
 
     defaultConfig {
         applicationId = "org.mupen64plusae.v3.alpha"
+        // M64-DS version: goes up with every GitHub build so Android installs it as an update
+        def build = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInteger()
+        versionCode = 10000 + build
+        versionName = "M64-DS 1.0." + build
+    }
+    // M64-DS: one fixed key, so every new build installs as an update over the previous one
+    signingConfigs {
+        m64ds {
+            storeFile = rootProject.file("signing/m64ds.keystore")
+            storePassword = "m64ds-thor"
+            keyAlias = "m64ds"
+            keyPassword = "m64ds-thor"
+        }
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.m64ds
             // Separate package so this AYN Thor build installs next to the official app
             applicationIdSuffix ".thor"
             minifyEnabled true

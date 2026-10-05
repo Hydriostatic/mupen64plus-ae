@@ -50,6 +50,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SearchView;
@@ -1417,6 +1418,26 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
     public void exitFromSecondScreen()
     {
         finishAndRemoveTask();
+    }
+
+    // Home / Recents: both screens leave together. Launches the app makes itself (a game, a
+    // page) also trigger onUserLeaveHint, so those are ignored.
+    private long mOwnLaunchUntil = 0;
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public void startActivityForResult(@NonNull Intent intent, int requestCode, @Nullable Bundle options)
+    {
+        mOwnLaunchUntil = android.os.SystemClock.uptimeMillis() + 1500;
+        super.startActivityForResult(intent, requestCode, options);
+    }
+
+    @Override
+    protected void onUserLeaveHint()
+    {
+        super.onUserLeaveHint();
+        if (android.os.SystemClock.uptimeMillis() < mOwnLaunchUntil) return;
+        if (mDrawerLayout != null) mDrawerLayout.onUserLeftApp();
     }
 
     public void onOpenDrawerButtonClicked(View view)

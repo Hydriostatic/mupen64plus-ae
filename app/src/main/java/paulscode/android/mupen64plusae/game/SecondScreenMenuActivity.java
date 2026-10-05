@@ -375,19 +375,26 @@ public class SecondScreenMenuActivity extends Activity
         return mShown;
     }
 
-    /** A key from the main screen that belongs to this menu. */
+    private final ControllerNav mNav = new ControllerNav();
+
+    /** A key that belongs to this menu (from either screen). */
     boolean dispatchKeyToMenu(KeyEvent event)
     {
         if (event.getAction() == KeyEvent.ACTION_DOWN && mMenuView != null) {
             View focus = getCurrentFocus();
             if (focus == null || focus.isInTouchMode()) focusMenuForController();
         }
-        return super.dispatchKeyEvent(event);
+        boolean handled = super.dispatchKeyEvent(event);
+        // Move the selection / select / back like Android does in a focused window
+        if (!handled) handled = mNav.onKey(this, event);
+        return handled;
     }
 
     boolean dispatchMotionToMenu(MotionEvent event)
     {
-        return super.dispatchGenericMotionEvent(event);
+        boolean handled = super.dispatchGenericMotionEvent(event);
+        if (!handled) handled = mNav.onMotion(this, event);
+        return handled;
     }
 
     /** Keys arriving at this window directly (it has input focus after being touched). */
@@ -402,7 +409,7 @@ public class SecondScreenMenuActivity extends Activity
     public boolean dispatchGenericMotionEvent(MotionEvent event)
     {
         if (mHost != null && mHost.onMotionFromMenuScreen(event)) return true;
-        return super.dispatchGenericMotionEvent(event);
+        return dispatchMotionToMenu(event);
     }
 
     /**
@@ -432,6 +439,25 @@ public class SecondScreenMenuActivity extends Activity
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                     android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb);
         }
+    }
+
+    // Home pressed while this screen had the focus: the main screen goes home with it
+    private long mOwnLaunchUntil = 0;
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public void startActivityForResult(android.content.Intent intent, int requestCode, Bundle options)
+    {
+        mOwnLaunchUntil = android.os.SystemClock.uptimeMillis() + 1500;
+        super.startActivityForResult(intent, requestCode, options);
+    }
+
+    @Override
+    protected void onUserLeaveHint()
+    {
+        super.onUserLeaveHint();
+        if (android.os.SystemClock.uptimeMillis() < mOwnLaunchUntil) return;
+        if (mHost != null) mHost.onUserLeftAppFromSecondScreen();
     }
 
     @Override

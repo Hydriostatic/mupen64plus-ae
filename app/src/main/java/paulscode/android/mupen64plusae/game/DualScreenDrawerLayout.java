@@ -19,7 +19,10 @@ package paulscode.android.mupen64plusae.game;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.ContextWrapper;
+import android.content.IntentFilter;
+import android.os.Build;
 import android.content.Intent;
 import android.hardware.display.DisplayManager;
 import android.os.Handler;
@@ -100,6 +103,8 @@ public class DualScreenDrawerLayout extends DrawerLayout
     /** In-game only: the controller currently drives the menu instead of the game. */
     private boolean mControllerOnMenu = false;
     private boolean mBypassForwarding = false;
+    /** Controller navigation for keys handed over from the second screen to this one. */
+    private final ControllerNav mHostNav = new ControllerNav();
     /** Back/Menu down was used to toggle the controller; swallow the matching up. */
     private boolean mSwallowToggleUp = false;
     /** In-game only: optional live info (e.g. Banjo-Tooie stats) shown instead of the menu. */
@@ -139,19 +144,88 @@ public class DualScreenDrawerLayout extends DrawerLayout
         }
     };
 
-    /** If the menu screen got covered while this screen still shows the app, bring it back. */
-    private final Runnable mRestoreMenuCheck = () -> {
-        if (mHostVisible && mMenuScreen != null && !mMenuScreen.isFinishing()) {
-            SecondScreen.bringMenuToFront(getContext(), mMenuScreen.getTaskId());
+    /**
+     * The second screen was covered. If it wasn't by the app itself (a page opened there, the
+     * game's own second screen) the user pressed Home there: both screens go home together.
+     */
+    private final Runnable mCoveredCheck = () -> {
+        if (!mHostVisible || mMenuScreen == null || mMenuScreen.isFinishing() || mMenuScreen.isShownToUser()) return;
+        Boolean covered = SecondScreen.isMenuCoveredByOtherApp(getContext(), mMenuScreen.getTaskId());
+        if (covered != null && covered) {
+            Log.i(TAG, "Home on the second screen; taking both screens home");
+            leaveApp(true);
         }
     };
 
     void onMenuScreenStopped(SecondScreenMenuActivity screen)
     {
         if (screen != mMenuScreen || !mHostVisible) return;
-        mHandler.removeCallbacks(mRestoreMenuCheck);
-        mHandler.postDelayed(mRestoreMenuCheck, 800);
+        mHandler.removeCallbacks(mCoveredCheck);
+        mHandler.postDelayed(mCoveredCheck, 300);
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // Leaving the app: both screens together
+    // ---------------------------------------------------------------------------------------------
+
+    static final String ACTION_APP_LEFT = "paulscode.android.mupen64plusae.SECOND_SCREEN_APP_LEFT";
+
+    /** Other screens of the app (also in the game's process) close their second screen too. */
+    private final BroadcastReceiver mAppLeftReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            finishMenuScreen();
+        }
+    };
+    private boolean mReceiverRegistered = false;
+
+    private void registerAppLeftReceiver()
+    {
+        if (mReceiverRegistered) return;
+        IntentFilter filter = new IntentFilter(ACTION_APP_LEFT);
+        if (Build.VERSION.SDK_INT >= 33) {
+            getContext().registerReceiver(mAppLeftReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            getContext().registerReceiver(mAppLeftReceiver, filter);
+        }
+        mReceiverRegistered = true;
+    }
+
+    /**
+     * Call from the activity's onUserLeaveHint(): the user pressed Home / Recents on the main
+     * screen. The second screen goes away at the same moment.
+     */
+    public void onUserLeftApp()
+    {
+        if (mSecondScreenActive) leaveApp(false);
+    }
+
+    /** Home / Recents pressed while the second screen had the focus. */
+    void onUserLeftAppFromSecondScreen()
+    {
+        if (mSecondScreenActive) leaveApp(true);
+    }
+
+    private void leaveApp(boolean sendMainScreenHome)
+    {
+        finishMenuScreen();
+        Context ctx = getContext();
+        Intent intent = new Intent(ACTION_APP_LEFT);
+        intent.setPackage(ctx.getPackageName());
+        ctx.sendBroadcast(intent);
+        if (sendMainScreenHome) {
+            Activity activity = getActivity();
+            if (activity != null) activity.moveTaskToBack(true);
+        }
+    }
+
+    /** Give the main screen the controller's input focus (the newly opened second screen took it). */
+    private final Runnable mFocusMainScreen = () -> {
+        if (mHostVisible && mMenuScreen != null && !isControllerOnMenu()) {
+            Activity activity = getActivity();
+            if (activity != null) SecondScreen.bringTaskToFront(activity, activity.getTaskId());
+        }
+    };
 
     private final DisplayManager.DisplayListener mDisplayListener = new DisplayManager.DisplayListener() {
         @Override
@@ -213,6 +287,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
         if (enabled) {
             mDisplayManager.registerDisplayListener(mDisplayListener, mHandler);
+            registerAppLeftReceiver();
             enterSecondScreenMode(true);
         } else {
             mDisplayManager.unregisterDisplayListener(mDisplayListener);
@@ -389,6 +464,8 @@ public class DualScreenDrawerLayout extends DrawerLayout
         }
         mMenuScreen = screen;
         syncMenuScreen();
+        mHandler.removeCallbacks(mFocusMainScreen);
+        mHandler.postDelayed(mFocusMainScreen, 250);
     }
 
     /** The second screen came back into view (e.g. the game's own second screen closed). */
@@ -504,6 +581,13 @@ public class DualScreenDrawerLayout extends DrawerLayout
     {
         if (mDisplayManager != null) {
             mDisplayManager.unregisterDisplayListener(mDisplayListener);
+        }
+        if (mReceiverRegistered) {
+            try {
+                getContext().unregisterReceiver(mAppLeftReceiver);
+            } catch (Exception ignored) {
+            }
+            mReceiverRegistered = false;
         }
         finishMenuScreen();
         super.onDetachedFromWindow();
@@ -689,8 +773,8 @@ public class DualScreenDrawerLayout extends DrawerLayout
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent event)
     {
-        if (mSecondScreenActive && !mBypassForwarding && mInGame && mControllerOnMenu) {
-            // The controller is on the menu: don't move the character
+        if (mSecondScreenActive && !mBypassForwarding && isControllerOnMenu()) {
+            // The controller is on the menu: move its selection (and not the character)
             if (mMenuScreen != null) mMenuScreen.dispatchMotionToMenu(event);
             return true;
         }
@@ -740,7 +824,11 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
         mBypassForwarding = true;
         try {
-            return activity.dispatchKeyEvent(event);
+            boolean handled = activity.dispatchKeyEvent(event);
+            // Game list: Android doesn't move the selection for keys handed over from the other
+            // screen, so do it (the game handles its own keys)
+            if (!handled && !mInGame) handled = mHostNav.onKey(activity, event);
+            return handled;
         } finally {
             mBypassForwarding = false;
         }
@@ -752,7 +840,9 @@ public class DualScreenDrawerLayout extends DrawerLayout
         if (activity == null) return false;
         mBypassForwarding = true;
         try {
-            return activity.dispatchGenericMotionEvent(event);
+            boolean handled = activity.dispatchGenericMotionEvent(event);
+            if (!handled && !mInGame) handled = mHostNav.onMotion(activity, event);
+            return handled;
         } finally {
             mBypassForwarding = false;
         }

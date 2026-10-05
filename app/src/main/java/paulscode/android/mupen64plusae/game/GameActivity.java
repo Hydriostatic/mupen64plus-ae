@@ -40,6 +40,7 @@ import android.os.Vibrator;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentManager;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -777,6 +778,26 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         if (mOverlay != null) {
             mOverlay.onDestroy();
         }
+    }
+
+    // Home / Recents: both screens leave together. Launches the app makes itself (a game, a
+    // page) also trigger onUserLeaveHint, so those are ignored.
+    private long mOwnLaunchUntil = 0;
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public void startActivityForResult(@NonNull Intent intent, int requestCode, @Nullable Bundle options)
+    {
+        mOwnLaunchUntil = android.os.SystemClock.uptimeMillis() + 1500;
+        super.startActivityForResult(intent, requestCode, options);
+    }
+
+    @Override
+    protected void onUserLeaveHint()
+    {
+        super.onUserLeaveHint();
+        if (android.os.SystemClock.uptimeMillis() < mOwnLaunchUntil) return;
+        if (mDrawerLayout != null) mDrawerLayout.onUserLeftApp();
     }
 
     @Override

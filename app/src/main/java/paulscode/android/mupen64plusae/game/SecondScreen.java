@@ -96,6 +96,45 @@ public final class SecondScreen
         }
     }
 
+    /**
+     * Is the second-screen menu (task {@code menuTaskId}) hidden by something that isn't part of
+     * the app (e.g. the system home screen)? Null when this can't be told (Android 11 and older).
+     */
+    @Nullable
+    public static Boolean isMenuCoveredByOtherApp(@NonNull Context context, int menuTaskId)
+    {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null;
+        ActivityManager am = context.getSystemService(ActivityManager.class);
+        if (am == null) return null;
+        try {
+            boolean menuVisible = false, otherMenuVisible = false;
+            for (ActivityManager.AppTask task : am.getAppTasks()) {
+                ActivityManager.RecentTaskInfo info = task.getTaskInfo();
+                if (info == null || !isMenuTask(info)) continue;
+                if (info.taskId == menuTaskId) menuVisible = info.isVisible();
+                else if (info.isVisible()) otherMenuVisible = true; // e.g. the game's second screen
+            }
+            return !menuVisible && !otherMenuVisible;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Bring one of the app's tasks to the front (gives its screen the input focus). */
+    public static void bringTaskToFront(@NonNull Context context, int taskId)
+    {
+        ActivityManager am = context.getSystemService(ActivityManager.class);
+        if (am == null) return;
+        try {
+            for (ActivityManager.AppTask task : am.getAppTasks()) {
+                ActivityManager.RecentTaskInfo info = task.getTaskInfo();
+                if (info != null && info.taskId == taskId) task.moveToFront();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Couldn't bring task to front", e);
+        }
+    }
+
     /** Bring the second-screen menu's task back in front on its screen, if it got covered. */
     public static void bringMenuToFront(@NonNull Context context, int menuTaskId)
     {
