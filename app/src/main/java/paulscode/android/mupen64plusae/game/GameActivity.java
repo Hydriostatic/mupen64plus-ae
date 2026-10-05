@@ -459,7 +459,8 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         // Banjo-Tooie (USA): live stats (health, collectibles, ammo) on the second screen
         if (mDrawerLayout.isUsingSecondScreen() &&
                 BanjoTooieStats.isBanjoTooieUsa(mRomHeaderName, mRomCountryCode)) {
-            mDrawerLayout.setInfoPanel(new BanjoTooieStatsView(this, mDrawerLayout::toggleControllerTarget));
+            mDrawerLayout.setInfoPanel(new BanjoTooiePauseView(this, mDrawerLayout::toggleControllerTarget,
+                    this::saveAndQuitFromSecondScreen));
         }
 
         if (!TextUtils.isEmpty(mRomArtPath) && new File(mRomArtPath).exists() && FileUtil.isFileImage(new File(mRomArtPath)))
@@ -778,6 +779,15 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         if (mOverlay != null) {
             mOverlay.onDestroy();
         }
+    }
+
+    /** "Save and Quit" on the Banjo-Tooie screen: save to the current slot, then leave the game. */
+    void saveAndQuitFromSecondScreen()
+    {
+        if (mCoreFragment == null) return;
+        mCoreFragment.saveSlot();
+        // Give the save a moment to be written before shutting the emulator down
+        new Handler(Looper.getMainLooper()).postDelayed(() -> onExitRequested(true), 1500);
     }
 
     // Home / Recents: both screens leave together. Launches the app makes itself (a game, a

@@ -157,6 +157,105 @@ public final class BanjoTooieStats
             "Isle o' Hags"
     };
     static final int WORLD_COUNT = 9;
+
+    // --- Per-world data (map IDs, per-world collectibles and Jamjars moves), from the
+    // Archipelago Banjo-Tooie connector (MIT, (c) g0goTBC, Austin, jjjj12212). Flags are
+    // (byte << 3) | bit in the same flag block as above.
+    private static final int CURRENT_MAP = 0x132DC2; // u16
+
+    /** Map ID -> world index (WORLDS order); maps not listed keep the last known world. */
+    static final int[][] MAP_WORLD = {
+            {0x0AD, 8}, {0x0AE, 8}, {0x0AF, 8}, {0x0B7, 0}, {0x0B8, 0}, {0x0B9, 0}, {0x0BB, 0}, {0x0C4, 0},
+            {0x0C5, 0}, {0x0C7, 1}, {0x0CA, 1}, {0x0CC, 1}, {0x0CD, 1}, {0x0CE, 1}, {0x0CF, 1}, {0x0D1, 1},
+            {0x0D2, 1}, {0x0D3, 1}, {0x0D5, 2}, {0x0D6, 2}, {0x0D7, 1}, {0x0D8, 1}, {0x0DA, 1}, {0x0DD, 2},
+            {0x0E1, 2}, {0x0E6, 2}, {0x0E7, 2}, {0x0EA, 2}, {0x0EB, 2}, {0x0EC, 2}, {0x0ED, 3}, {0x0EE, 3},
+            {0x0EF, 3}, {0x0F4, 3}, {0x0F6, 3}, {0x0F7, 3}, {0x0F8, 3}, {0x0F9, 2}, {0x0FA, 3}, {0x0FC, 3},
+            {0x0FF, 3}, {0x100, 5}, {0x101, 5}, {0x102, 5}, {0x103, 5}, {0x104, 5}, {0x106, 5}, {0x108, 5},
+            {0x109, 5}, {0x10A, 5}, {0x10B, 5}, {0x10D, 5}, {0x10E, 5}, {0x10F, 5}, {0x110, 5}, {0x111, 5},
+            {0x112, 4}, {0x113, 4}, {0x114, 4}, {0x115, 4}, {0x116, 4}, {0x117, 4}, {0x118, 4}, {0x119, 4},
+            {0x11A, 4}, {0x123, 4}, {0x127, 6}, {0x128, 6}, {0x129, 6}, {0x12A, 6}, {0x12B, 6}, {0x12C, 6},
+            {0x12D, 6}, {0x131, 6}, {0x132, 6}, {0x133, 6}, {0x136, 7}, {0x137, 7}, {0x138, 7}, {0x139, 7},
+            {0x13A, 7}, {0x13D, 7}, {0x13E, 7}, {0x13F, 7}, {0x140, 7}, {0x142, 8}, {0x143, 8}, {0x14F, 8},
+            {0x150, 8}, {0x152, 8}, {0x154, 8}, {0x155, 8}, {0x15A, 8}, {0x163, 1}, {0x176, 2}, {0x177, 0},
+            {0x178, 0}, {0x17A, 0}, {0x181, 3}, {0x187, 5}, {0x1A6, 3}, {0x1A7, 3}, {0x1A8, 3}, {0x1A9, 3},
+    };
+    static final int[][] WORLD_HONEYCOMB_FLAGS = {
+            {0x01FA, 0x01FB, 0x01FC},
+            {0x01FD, 0x01FE, 0x01FF},
+            {0x0200, 0x0201, 0x0202},
+            {0x0203, 0x0204, 0x0205},
+            {0x0206, 0x0207, 0x0208},
+            {0x0209, 0x020A, 0x020B},
+            {0x020C, 0x020D, 0x020E},
+            {0x020F, 0x0210, 0x0211},
+            {0x0212}
+    };
+    static final int[][] WORLD_GLOWBO_FLAGS = {
+            {0x0217, 0x0218},
+            {0x0219, 0x021A},
+            {0x021B, 0x021C},
+            {0x021D, 0x021E},
+            {0x021F, 0x0220},
+            {0x0221, 0x0222},
+            {0x002E, 0x0223, 0x0224},
+            {0x0225, 0x0226},
+            {0x0227}
+    };
+    static final int[][] WORLD_JINJO_FLAGS = {
+            {0x01CC, 0x01CD, 0x01CE, 0x01CF, 0x01D0},
+            {0x01D1, 0x01D2, 0x01D3, 0x01D4, 0x01D5},
+            {0x01D6, 0x01D7, 0x01D8, 0x01D9, 0x01DA},
+            {0x01DB, 0x01DC, 0x01DD, 0x01DE, 0x01DF},
+            {0x01E0, 0x01E1, 0x01E2, 0x01E3, 0x01E4},
+            {0x01E5, 0x01E6, 0x01E7, 0x01E8, 0x01E9},
+            {0x01EA, 0x01EB, 0x01EC, 0x01ED, 0x01EE},
+            {0x01EF, 0x01F0, 0x01F1, 0x01F2, 0x01F3},
+            {0x01F4, 0x01F5, 0x01F6, 0x01F7, 0x01F8}
+    };
+    static final int[][] WORLD_PAGE_FLAGS = {
+            {0x02B3, 0x02B4, 0x02B5},
+            {0x02B6, 0x02B7, 0x02B8},
+            {0x02B9, 0x02BA, 0x02BB},
+            {0x02BC, 0x02BD, 0x02BE},
+            {0x02BF, 0x02C0, 0x02C1},
+            {0x02C2, 0x02C3, 0x02C4},
+            {0x02C5, 0x02C6, 0x02C7},
+            {0x02C8, 0x02C9, 0x02CA},
+            {0x02CB}
+    };
+    /** Jamjars / Humba-free moves taught in each world: flag, name. */
+    static final int[][] WORLD_MOVE_FLAGS = {
+            {0x00DA, 0x00DB, 0x00D9},
+            {0x00DE, 0x00DF},
+            {0x00E1, 0x00E0, 0x00EE},
+            {0x00E2, 0x00E3, 0x00E4},
+            {0x00EB, 0x00EC, 0x00ED},
+            {0x00E8, 0x00EA, 0x00E9},
+            {0x00E7, 0x00E6},
+            {0x00EF},
+            {0x00F4, 0x00F2, 0x00F1, 0x00F3}
+    };
+    static final String[][] WORLD_MOVE_NAMES = {
+            {"Breegull Blaster", "Egg Aim", "Grip Grab"},
+            {"Bill Drill", "Beak Bayonet"},
+            {"Split Up", "Airborne Egg Aiming", "Pack Whack"},
+            {"Wing Whack", "Talon Torpedo", "Sub-Aqua Egg Aiming"},
+            {"Springy Step Shoes", "Taxi Pack", "Hatch"},
+            {"Snooze Pack", "Claw Clamber Boots", "Leg Spring"},
+            {"Glide", "Shack Pack"},
+            {"Sack Pack"},
+            {"Ice Eggs", "Grenade Eggs", "Fire Eggs", "Clockwork Kazooie Eggs"}
+    };
+
+    /** Normal per-world maximums (Isle o' Hags: the hub, Spiral Mountain and Jinjo Village). */
+    static final int JIGGIES_PER_WORLD = 10, NOTES_PER_WORLD = 100;
+
+    /** World index for a map ID, or -1 if it isn't a known world map. */
+    static int worldForMap(int map)
+    {
+        for (int[] e : MAP_WORLD) if (e[0] == map) return e[1];
+        return -1;
+    }
     static final int NESTS_PER_WORLD = 16;
 
 
@@ -179,6 +278,19 @@ public final class BanjoTooieStats
         /** Per world, in {@link #WORLDS} order. */
         public final int[] worldJiggies = new int[WORLD_COUNT];
         public final int[] worldNotes = new int[WORLD_COUNT];
+        public final int[] worldHoneycombs = new int[WORLD_COUNT];
+        public final int[] worldGlowbos = new int[WORLD_COUNT];
+        public final int[] worldJinjos = new int[WORLD_COUNT];
+        public final int[] worldPages = new int[WORLD_COUNT];
+        public final int[] worldMoves = new int[WORLD_COUNT];
+        /** Learned flag for each move, same layout as WORLD_MOVE_FLAGS. */
+        public final boolean[][] movesLearned = new boolean[WORLD_COUNT][];
+        public int movesTotal;
+        /** Jinjo families rescued (each gives a Jiggy from King Jingaling's people). */
+        public int jinjoFamilies;
+        /** Current map ID and the world it belongs to (last known world on in-between maps). */
+        public int map = -1;
+        public int world = -1;
         /** Health of every character, indexed by character id (-1 = no entry). */
         public final int[] allHealth = new int[CHARACTER_SLOTS];
         public final int[] allMaxHealth = new int[CHARACTER_SLOTS];
@@ -231,6 +343,14 @@ public final class BanjoTooieStats
         return ((a[i] & 0xFF) << 24) | ((a[i + 1] & 0xFF) << 16) | ((a[i + 2] & 0xFF) << 8) | (a[i + 3] & 0xFF);
     }
 
+    private int mLastWorld = -1;
+
+    private boolean isFlagSet(int f)
+    {
+        int byteIndex = f >> 3;
+        return byteIndex < mFlags.length && (mFlags[byteIndex] & (1 << (f & 7))) != 0;
+    }
+
     private int countFlags(int[] flags)
     {
         return countFlags(flags, 0, flags.length);
@@ -277,6 +397,14 @@ public final class BanjoTooieStats
             }
         }
 
+        // Current map -> world (keeps the last known world on corridors, cutscenes...)
+        if (read(CURRENT_MAP, mOne, 2)) {
+            s.map = u16(mOne, 0);
+            int w = worldForMap(s.map);
+            if (w >= 0) mLastWorld = w;
+        }
+        s.world = mLastWorld;
+
         // The flag block moves around, so follow the pointer each time
         s.flagBlockAddress = 0;
         if (read(FLAG_BLOCK_PTR, mOne, 4)) {
@@ -298,6 +426,24 @@ public final class BanjoTooieStats
                                         + countFlags(JINJO_FAMILY_JIGGY_FLAGS);
                         s.worldNotes[w] = countFlags(NOTE_NEST_FLAGS, w * NESTS_PER_WORLD, NESTS_PER_WORLD) * 5
                                 + countFlags(TREBLE_CLEF_FLAGS, w, 1) * 20;
+                    }
+                    s.jinjoFamilies = countFlags(JINJO_FAMILY_JIGGY_FLAGS);
+                    s.movesTotal = 0;
+                    for (int w = 0; w < WORLD_COUNT; w++) {
+                        s.worldHoneycombs[w] = countFlags(WORLD_HONEYCOMB_FLAGS[w]);
+                        s.worldGlowbos[w] = countFlags(WORLD_GLOWBO_FLAGS[w]);
+                        s.worldJinjos[w] = countFlags(WORLD_JINJO_FLAGS[w]);
+                        s.worldPages[w] = countFlags(WORLD_PAGE_FLAGS[w]);
+                        int[] mv = WORLD_MOVE_FLAGS[w];
+                        if (s.movesLearned[w] == null) s.movesLearned[w] = new boolean[mv.length];
+                        int learned = 0;
+                        for (int i = 0; i < mv.length; i++) {
+                            boolean on = isFlagSet(mv[i]);
+                            s.movesLearned[w][i] = on;
+                            if (on) learned++;
+                        }
+                        s.worldMoves[w] = learned;
+                        s.movesTotal += learned;
                     }
                     s.valid = true;
                 }
