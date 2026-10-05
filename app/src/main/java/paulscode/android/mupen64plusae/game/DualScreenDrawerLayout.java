@@ -114,13 +114,44 @@ public class DualScreenDrawerLayout extends DrawerLayout
         }
     };
 
-    /** Closes the grey second screen once it's clear the user has left the app. */
-    private final Runnable mLeftAppCheck = () -> {
-        if (!mHostVisible && mMenuScreen != null && mMenuScreen.isShownToUser()) {
-            Log.i(TAG, "App left; closing second screen");
-            finishMenuScreen();
+    /**
+     * Closes the second screen once the user has really left the app (e.g. Home). While any
+     * screen of the app is still showing (the game, a settings page, a file picker opened by the
+     * app...) it stays, grey if there is nothing to show.
+     */
+    private final Runnable mLeftAppCheck = new Runnable() {
+        @Override
+        public void run() {
+            if (mHostVisible || mMenuScreen == null) return;
+            Boolean appVisible = SecondScreen.isAppVisible(getContext());
+            if (appVisible == null) {
+                // Older Android: can't tell, use the screen's own state
+                if (mMenuScreen.isShownToUser()) {
+                    Log.i(TAG, "App left; closing second screen");
+                    finishMenuScreen();
+                }
+            } else if (!appVisible) {
+                Log.i(TAG, "App left; closing second screen");
+                finishMenuScreen();
+            } else {
+                mHandler.postDelayed(this, LEFT_APP_TIMEOUT_MS);
+            }
         }
     };
+
+    /** If the menu screen got covered while this screen still shows the app, bring it back. */
+    private final Runnable mRestoreMenuCheck = () -> {
+        if (mHostVisible && mMenuScreen != null && !mMenuScreen.isFinishing()) {
+            SecondScreen.bringMenuToFront(getContext(), mMenuScreen.getTaskId());
+        }
+    };
+
+    void onMenuScreenStopped(SecondScreenMenuActivity screen)
+    {
+        if (screen != mMenuScreen || !mHostVisible) return;
+        mHandler.removeCallbacks(mRestoreMenuCheck);
+        mHandler.postDelayed(mRestoreMenuCheck, 800);
+    }
 
     private final DisplayManager.DisplayListener mDisplayListener = new DisplayManager.DisplayListener() {
         @Override

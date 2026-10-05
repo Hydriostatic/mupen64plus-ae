@@ -69,7 +69,7 @@ public class BanjoTooieStatsView extends FrameLayout
     private static final long REFRESH_MS = 200;
 
     // Palette: dark slate panels, warm gold, wooden tabs
-    private static final int BG_TOP = 0xFF1A1E23, BG_BOTTOM = 0xFF0E1013;
+    private static final int BG_TOP = 0xB81A1E23, BG_BOTTOM = 0xB80E1013; // see-through: app icon behind
     private static final int PANEL_TOP = 0xFF22272D, PANEL_BOTTOM = 0xFF171A1E, PANEL_EDGE = 0xFF353B43;
     private static final int GOLD = 0xFFF7B731, GOLD_LIGHT = 0xFFFFE08A;
     private static final int WHITE = 0xFFF8F4EC, MUTED = 0xFF9AA0A8;

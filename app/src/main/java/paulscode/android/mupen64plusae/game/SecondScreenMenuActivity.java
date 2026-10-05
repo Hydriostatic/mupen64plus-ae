@@ -35,6 +35,16 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.lang.ref.WeakReference;
+import java.util.HashMap;
+import java.util.Map;
+
+import android.graphics.RenderEffect;
+import android.graphics.Shader;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
+import android.widget.ImageView;
+
+import paulscode.android.mupen64plusae.GameSidebar;
 
 import paulscode.android.mupen64plusae.R;
 
@@ -53,9 +63,6 @@ public class SecondScreenMenuActivity extends Activity
     /** Background of the second screen, also shown when there's no menu on it. */
     static final int BACKGROUND_GREY = 0xFF303030;
 
-    /** The menu is a centered column at most this wide. */
-    private static final int MENU_MAX_WIDTH_DP = 480;
-
     private static WeakReference<DualScreenDrawerLayout> sHost = new WeakReference<>(null);
 
     static void setHost(DualScreenDrawerLayout host)
@@ -63,7 +70,18 @@ public class SecondScreenMenuActivity extends Activity
         sHost = new WeakReference<>(host);
     }
 
+    /** The live second-screen menu of this process, used to open pages on the second screen. */
+    private static WeakReference<SecondScreenMenuActivity> sCurrent = new WeakReference<>(null);
+
+    static SecondScreenMenuActivity current()
+    {
+        SecondScreenMenuActivity a = sCurrent.get();
+        return a != null && !a.isFinishing() && !a.isDestroyed() ? a : null;
+    }
+
     private DualScreenDrawerLayout mHost;
+    /** Backgrounds replaced to make the menus see-through, restored when the menu goes back. */
+    private final Map<View, Drawable> mSavedBackgrounds = new HashMap<>();
     private View mMenuView;
     private View mTopBar;
     private TextView mHint;
@@ -103,6 +121,8 @@ public class SecondScreenMenuActivity extends Activity
         }
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        sCurrent = new WeakReference<>(this);
+        registerBackCallback();
         buildLayout();
         if (DualScreenDrawerLayout.DIAGNOSTICS) {
             android.widget.Toast.makeText(this, "2nd screen: menu opened here (screen " + actualDisplay + ")",
@@ -121,27 +141,37 @@ public class SecondScreenMenuActivity extends Activity
         FrameLayout root = new FrameLayout(ctx);
         root.setBackgroundColor(BACKGROUND_GREY);
 
-        // Centered column: as wide as the screen, up to MENU_MAX_WIDTH_DP
+        // App icon behind everything, blurred and half transparent, visible through the menus
+        ImageView logo = new ImageView(ctx);
+        logo.setImageResource(R.mipmap.ic_launcher_foreground);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        logo.setAlpha(0.5f);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            float radius = 10 * dp;
+            logo.setRenderEffect(RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.DECAL));
+        }
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        int logoSize = Math.round(Math.min(screenWidth, screenHeight) * 1.1f);
+        root.addView(logo, new FrameLayout.LayoutParams(logoSize, logoSize, Gravity.CENTER));
+
+        // The menus use the whole (small) screen
         LinearLayout column = new LinearLayout(ctx);
         column.setOrientation(LinearLayout.VERTICAL);
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int columnWidth = Math.min(screenWidth, Math.round(MENU_MAX_WIDTH_DP * dp));
-        FrameLayout.LayoutParams columnLp = new FrameLayout.LayoutParams(
-                columnWidth, ViewGroup.LayoutParams.MATCH_PARENT);
-        columnLp.gravity = Gravity.CENTER_HORIZONTAL;
-        root.addView(column, columnLp);
+        root.addView(column, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         // Game list only: a Back bar while a game's options (or the opened menu) have the buttons
         LinearLayout topBar = new LinearLayout(ctx);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
-        topBar.setPadding(pad, pad / 2, pad, pad / 2);
-        topBar.setBackgroundColor(0xFF202020);
+        topBar.setPadding(pad, pad / 4, pad / 2, pad / 4);
+        topBar.setBackgroundColor(0xB0181818);
 
         TextView title = new TextView(ctx);
         title.setText(R.string.app_name);
         title.setTextColor(Color.WHITE);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         topBar.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
@@ -172,10 +202,10 @@ public class SecondScreenMenuActivity extends Activity
         // In-game only: which screen the controller buttons drive right now
         TextView hint = new TextView(ctx);
         hint.setTextColor(0xFFDDDDDD);
-        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         hint.setGravity(Gravity.CENTER);
-        hint.setPadding(pad, pad / 2, pad, pad / 2);
-        hint.setBackgroundColor(0xFF202020);
+        hint.setPadding(pad, pad / 3, pad, pad / 3);
+        hint.setBackgroundColor(0xB0181818);
         hint.setVisibility(inGame ? View.VISIBLE : View.GONE);
         hint.setClickable(true);
         hint.setOnClickListener(v -> {
@@ -193,6 +223,7 @@ public class SecondScreenMenuActivity extends Activity
     void attachMenu(View menuView)
     {
         if (mMenuContainer == null || menuView == null) return;
+        styleForSecondScreen(menuView);
         if (menuView.getParent() == mMenuContainer) return;
         if (menuView.getParent() instanceof ViewGroup) {
             ((ViewGroup) menuView.getParent()).removeView(menuView);
@@ -205,10 +236,52 @@ public class SecondScreenMenuActivity extends Activity
     /** Hand the menu back; this screen then shows plain grey. */
     void detachMenu()
     {
+        if (mMenuView != null) restoreStyle(mMenuView);
         if (mMenuView != null && mMenuView.getParent() instanceof ViewGroup) {
             ((ViewGroup) mMenuView.getParent()).removeView(mMenuView);
         }
         mMenuView = null;
+    }
+
+    /** Make the menus see-through (so the app icon shows behind them) and compact. */
+    private void styleForSecondScreen(View view)
+    {
+        if (view == mMenuView || mMenuView == null) {
+            makeSeeThrough(view, null);
+        }
+        compact(view, true);
+    }
+
+    private void makeSeeThrough(View view, Drawable replacement)
+    {
+        if (!mSavedBackgrounds.containsKey(view)) mSavedBackgrounds.put(view, view.getBackground());
+        view.setBackground(replacement);
+        if (view instanceof ViewGroup && !(view instanceof GameSidebar)) {
+            ViewGroup g = (ViewGroup) view;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                View c = g.getChildAt(i);
+                if (c instanceof GameSidebar) makeSeeThrough(c, new ColorDrawable(0x40000000));
+            }
+        }
+    }
+
+    private void restoreStyle(View view)
+    {
+        for (Map.Entry<View, Drawable> e : mSavedBackgrounds.entrySet()) {
+            e.getKey().setBackground(e.getValue());
+        }
+        mSavedBackgrounds.clear();
+        compact(view, false);
+    }
+
+    private static void compact(View view, boolean compact)
+    {
+        if (view instanceof GameSidebar) {
+            ((GameSidebar) view).setCompact(compact);
+        } else if (view instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) view;
+            for (int i = 0; i < g.getChildCount(); i++) compact(g.getChildAt(i), compact);
+        }
     }
 
     private void detachInfoPanel()
@@ -268,7 +341,7 @@ public class SecondScreenMenuActivity extends Activity
         mHint.setVisibility(View.VISIBLE);
         mHint.setText(controllerOnMenu ? R.string.secondScreenMenu_hintOnMenu
                 : R.string.secondScreenMenu_hintOnGame);
-        mHint.setBackgroundColor(controllerOnMenu ? 0xFF1E4A7A : 0xFF202020);
+        mHint.setBackgroundColor(controllerOnMenu ? 0xE01E4A7A : 0xB0181818);
     }
 
     /** Give the menu list controller focus, with a visible highlight even after touches. */
@@ -278,6 +351,9 @@ public class SecondScreenMenuActivity extends Activity
         View target = mMenuView.findViewById(R.id.gameSidebar);
         if (target == null || target.getVisibility() != View.VISIBLE) {
             target = mMenuView.findViewById(R.id.drawerNavigation);
+        }
+        if (target == null || target.getVisibility() != View.VISIBLE) {
+            target = mMenuView.findViewById(R.id.galleryHomePanel);
         }
         if (target == null || target.getVisibility() != View.VISIBLE) target = mMenuView;
         // requestFocusFromTouch leaves touch mode, so the selected item is highlighted
@@ -290,7 +366,8 @@ public class SecondScreenMenuActivity extends Activity
         detachMenu();
         detachInfoPanel();
         mHost = null;
-        finish();
+        // Also closes any settings page opened on top of it on this screen
+        finishAndRemoveTask();
     }
 
     boolean isShownToUser()
@@ -328,11 +405,42 @@ public class SecondScreenMenuActivity extends Activity
         return super.dispatchGenericMotionEvent(event);
     }
 
+    /**
+     * Back must never close this screen or send it to the background (that would leave the main
+     * screen alone). It is routed to the host like a Back key press instead.
+     */
+    private void routeBack()
+    {
+        dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK));
+        dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK));
+    }
+
     @SuppressWarnings("deprecation")
     @Override
     public void onBackPressed()
     {
-        // Never close this screen with Back; Back is routed by the host in dispatchKeyEvent
+        routeBack();
+    }
+
+    private Object mBackCallback;
+
+    private void registerBackCallback()
+    {
+        if (Build.VERSION.SDK_INT >= 33) {
+            android.window.OnBackInvokedCallback cb = this::routeBack;
+            mBackCallback = cb;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, cb);
+        }
+    }
+
+    @Override
+    protected void onStop()
+    {
+        super.onStop();
+        // Something covered this screen. If the main screen is still showing the app, bring the
+        // menu back (it must never be left alone)
+        if (!isFinishing() && mHost != null) mHost.onMenuScreenStopped(this);
     }
 
     @Override
@@ -353,6 +461,11 @@ public class SecondScreenMenuActivity extends Activity
     @Override
     protected void onDestroy()
     {
+        if (sCurrent.get() == this) sCurrent = new WeakReference<>(null);
+        if (Build.VERSION.SDK_INT >= 33 && mBackCallback != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
+                    (android.window.OnBackInvokedCallback) mBackCallback);
+        }
         detachMenu();
         detachInfoPanel();
         DualScreenDrawerLayout host = mHost;

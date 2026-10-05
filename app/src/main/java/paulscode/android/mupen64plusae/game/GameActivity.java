@@ -688,7 +688,10 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         }
 
         // Set the sidebar opacity
-        mGameSidebar.setBackground(new DrawerDrawable(mGlobalPrefs.displayActionBarTransparency));
+        // (on the second screen the menu is see-through, styled there)
+        if (!mDrawerLayout.isUsingSecondScreen()) {
+            mGameSidebar.setBackground(new DrawerDrawable(mGlobalPrefs.displayActionBarTransparency));
+        }
 
         if(mDrawerOpenState)
         {

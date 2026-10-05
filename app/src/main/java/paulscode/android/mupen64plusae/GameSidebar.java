@@ -21,6 +21,7 @@
 package paulscode.android.mupen64plusae;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -81,6 +82,46 @@ public class GameSidebar extends MenuListView
     public void setTitle( String title )
     {
         mGameTitle.setText( title );
+    }
+
+    /** Compact mode (second screen): hide the big cover art, keep the title. */
+    public void setCompact(boolean compact)
+    {
+        View art = mHeader.findViewById(R.id.imageLayout);
+        if (art != null) art.setVisibility(compact ? View.GONE : View.VISIBLE);
+    }
+
+    // A view shown instead of this list (e.g. the button home on the second screen). Code that
+    // shows/hides/focuses this sidebar then shows/hides/focuses the replacement instead.
+    private View mReplacement;
+
+    public void setReplacementView(View replacement)
+    {
+        int visibility = getVisibility();
+        if (mReplacement != null) super.setVisibility(mReplacement.getVisibility());
+        mReplacement = replacement;
+        if (replacement != null) {
+            replacement.setVisibility(visibility);
+            super.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    public void setVisibility(int visibility)
+    {
+        if (mReplacement != null) {
+            mReplacement.setVisibility(visibility);
+            super.setVisibility(View.GONE);
+        } else {
+            super.setVisibility(visibility);
+        }
+    }
+
+    @Override
+    public boolean requestFocus(int direction, Rect previouslyFocusedRect)
+    {
+        if (mReplacement != null) return mReplacement.requestFocus(direction, previouslyFocusedRect);
+        return super.requestFocus(direction, previouslyFocusedRect);
     }
 
     public void hideTitle() {

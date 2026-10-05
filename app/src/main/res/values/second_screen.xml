@@ -7,4 +7,5 @@
         <item name="android:windowBackground">@color/second_screen_grey</item>
         <item name="android:colorBackground">@color/second_screen_grey</item>
     </style>
+    <item name="galleryHomePanel" type="id" />
 </resources>

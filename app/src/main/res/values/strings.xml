@@ -680,6 +680,7 @@
     <string name="secondScreenMenu_paused">Paused</string>
     <string name="secondScreenMenu_hintOnGame">Buttons control the game · press Back or tap here for the menu</string>
     <string name="secondScreenMenu_hintOnMenu">Buttons control the menu · press Back or tap here to go back</string>
+    <string name="secondScreen_exit">Exit</string>
     <string name="secondScreenMenu_back">Back</string>
     <string name="secondScreenMenu_resume">Resume game</string>
     <string name="secondScreenMenu_tapToOpen">Tap to pause and open the menu</string>

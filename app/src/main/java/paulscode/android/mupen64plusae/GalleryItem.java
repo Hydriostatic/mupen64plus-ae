@@ -285,6 +285,11 @@ public class GalleryItem
                                 activity.galleryHalfSpacing );
                         tv1.setPadding( 0, 0, 0, 0 );
                         tv1.setTextSize( TypedValue.COMPLEX_UNIT_DIP, 13.0f*item.scale );
+
+                        // The cover already shows the name (dual-screen layout)
+                        boolean hideName = activity.hideGameNamesWithArt && item.artPath != null &&
+                                new java.io.File( item.artPath ).exists();
+                        tv1.setVisibility( hideName ? View.GONE : View.VISIBLE );
                         artView.setVisibility( View.VISIBLE );
 
                         artView.setImageResource( R.drawable.default_coverart );
@@ -297,7 +302,8 @@ public class GalleryItem
 
                         LinearLayout layout = view.findViewById( R.id.info );
                         layout.getLayoutParams().width = activity.galleryWidth;
-                        layout.getLayoutParams().height = (int)(activity.getResources().getDimension( R.dimen.galleryTextHeight )*item.scale);
+                        layout.getLayoutParams().height = hideName ? 0 :
+                                (int)(activity.getResources().getDimension( R.dimen.galleryTextHeight )*item.scale);
                     }
                 }
             }

@@ -18,7 +18,9 @@ package paulscode.android.mupen64plusae.game;
 
 import android.app.Activity;
 import android.app.ActivityOptions;
+import android.app.ActivityManager;
 import android.content.Context;
+import android.os.Build;
 import android.content.Intent;
 import android.hardware.display.DisplayManager;
 import android.util.Log;
@@ -66,6 +68,53 @@ public final class SecondScreen
         return fallback;
     }
 
+    private static boolean isMenuTask(ActivityManager.RecentTaskInfo info)
+    {
+        return info.baseActivity != null &&
+                info.baseActivity.getClassName().startsWith(SecondScreenMenuActivity.class.getName());
+    }
+
+    /**
+     * Is any screen of the app (other than the second-screen menu itself) still showing?
+     * Returns null when this can't be told (Android 11 and older).
+     */
+    @Nullable
+    public static Boolean isAppVisible(@NonNull Context context)
+    {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null;
+        ActivityManager am = context.getSystemService(ActivityManager.class);
+        if (am == null) return null;
+        try {
+            for (ActivityManager.AppTask task : am.getAppTasks()) {
+                ActivityManager.RecentTaskInfo info = task.getTaskInfo();
+                if (info == null || isMenuTask(info)) continue;
+                if (info.isVisible()) return true;
+            }
+            return false;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Bring the second-screen menu's task back in front on its screen, if it got covered. */
+    public static void bringMenuToFront(@NonNull Context context, int menuTaskId)
+    {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+        ActivityManager am = context.getSystemService(ActivityManager.class);
+        if (am == null) return;
+        try {
+            for (ActivityManager.AppTask task : am.getAppTasks()) {
+                ActivityManager.RecentTaskInfo info = task.getTaskInfo();
+                if (info != null && info.taskId == menuTaskId && !info.isVisible()) {
+                    Log.i(TAG, "Second-screen menu was covered; bringing it back");
+                    task.moveToFront();
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Couldn't bring the second-screen menu back", e);
+        }
+    }
+
     /** The display an activity is currently shown on. */
     @SuppressWarnings("deprecation")
     public static int displayOf(@NonNull Activity activity)
@@ -82,6 +131,18 @@ public final class SecondScreen
      */
     public static void startActivity(@NonNull Context context, @NonNull Intent intent)
     {
+        // Open it in the second screen's own task, on top of the menu: Back then always returns
+        // to the menu there, never to an empty screen
+        SecondScreenMenuActivity menu = SecondScreenMenuActivity.current();
+        if (menu != null && isEnabled(context)) {
+            try {
+                menu.startActivity(intent);
+                return;
+            } catch (Exception e) {
+                Log.w(TAG, "Couldn't open page from the second-screen menu", e);
+            }
+        }
+
         if (context instanceof Activity && isEnabled(context)) {
             Activity activity = (Activity) context;
             Display target = findMenuDisplay(activity);

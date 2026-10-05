@@ -41,6 +41,8 @@ import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.PointerIcon;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 
@@ -140,6 +142,17 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
     public int galleryMaxWidth;
     public int galleryHalfSpacing;
     public int galleryColumns = 2;
+    /** Grid columns used by the library grid (and its headings). */
+    private int mLibraryColumns = 2;
+
+    // Dual-screen layout (e.g. AYN Thor): menus on the second screen, the main screen shows
+    // the library on the left and recently played games on the right
+    private boolean mDualScreen = false;
+    private RecyclerView mRecentView;
+    private View mRecentDivider;
+    private GalleryHomePanel mHomePanel;
+    /** Hide the game name under covers that have art (the cover says it). */
+    public boolean hideGameNamesWithArt = false;
     public float galleryAspectRatio;
 
     // Misc.
@@ -506,6 +519,8 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
         // window, so they can't be found here afterwards.
         mDrawerLayout.setSecondScreenEnabled(mGlobalPrefs.inGameMenuOnSecondScreen, true,
                 SecondScreenAppMenuActivity.class);
+        mDualScreen = mDrawerLayout.isUsingSecondScreen();
+        if (mDualScreen) setUpDualScreen(toolbar, floatingActionButton);
 
         // find the retained fragment on activity restarts
         final FragmentManager fm = getSupportFragmentManager();
@@ -581,6 +596,9 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
+                // Back never leaves the app (that would leave the second screen alone):
+                // it closes popups, the search, or a game's options
+                if (mHomePanel != null && mHomePanel.handleBack()) return;
                 if( mDrawerLayout.isDrawerOpen( GravityCompat.START ) )
                 {
                     mDrawerLayout.closeDrawer( GravityCompat.START );
@@ -1128,7 +1146,22 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
 
     synchronized void refreshGrid(List<GalleryItem> items, List<GalleryItem> recentItems)
     {
-        if( mGlobalPrefs.isRecentShown && TextUtils.isEmpty(mSearchQuery) && recentItems.size() > 0 )
+        List<GalleryItem> recentPane = null;
+        if (mDualScreen)
+        {
+            // Library on the left; recently played gets its own pane on the right
+            List<GalleryItem> library = new ArrayList<>();
+            library.add( new GalleryItem( this, getString( R.string.galleryLibrary ) ) );
+            library.addAll( items );
+            items = library;
+
+            if (mGlobalPrefs.isRecentShown && recentItems.size() > 0) {
+                recentPane = new ArrayList<>();
+                recentPane.add( new GalleryItem( this, getString( R.string.galleryRecentlyPlayed ) ) );
+                recentPane.addAll( recentItems );
+            }
+        }
+        else if( mGlobalPrefs.isRecentShown && TextUtils.isEmpty(mSearchQuery) && recentItems.size() > 0 )
         {
             List<GalleryItem> combinedItems = new ArrayList<>();
 
@@ -1151,7 +1184,7 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
             {
                 // Headings will take up every span (column) in the grid
                 if( finalItems.get( position ).isHeading )
-                    return galleryColumns;
+                    return mLibraryColumns;
 
                 // Games will fit in a single column
                 return 1;
@@ -1169,12 +1202,28 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
         int widthPixels = mDrawerLayout.getWidth();
 
         int width = widthPixels - galleryHalfSpacing * 2;
+        if (mDualScreen) {
+            // Room for the divider and the second pane's padding
+            width -= mRecentDivider.getLayoutParams().width + mGridView.getPaddingLeft() + mGridView.getPaddingRight();
+            width -= mGridView.getPaddingLeft() + mGridView.getPaddingRight();
+        }
         width = Math.max(width, galleryHalfSpacing*4);
         galleryColumns = (int) Math
                 .ceil( width * 1.0 / ( galleryMaxWidth + galleryHalfSpacing * 2 ) );
         galleryWidth = width / galleryColumns - galleryHalfSpacing * 2;
 
-        layoutManager.setSpanCount( galleryColumns );
+        mLibraryColumns = galleryColumns;
+        if (mDualScreen) {
+            int recentColumns = 0;
+            if (recentPane != null && galleryColumns >= 2) {
+                recentColumns = Math.max(1, Math.round(galleryColumns * 0.3f));
+                recentColumns = Math.min(recentColumns, galleryColumns - 1);
+            }
+            mLibraryColumns = galleryColumns - recentColumns;
+            showRecentPane(recentColumns > 0 ? recentPane : null, recentColumns);
+        }
+
+        layoutManager.setSpanCount( mLibraryColumns );
 
         mGridView.setFocusable(false);
         mGridView.setFocusableInTouchMode(false);
@@ -1273,6 +1322,101 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
     @Override
     public boolean onKey(View view, int i, KeyEvent keyEvent) {
         return false;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Dual-screen layout
+    // ---------------------------------------------------------------------------------------------
+
+    private void setUpDualScreen(View toolbar, View addRomsButton)
+    {
+        final float dp = getResources().getDisplayMetrics().density;
+
+        // Search, the menu button and "add ROMs" live on the second screen now
+        if (toolbar.getParent() instanceof View) ((View) toolbar.getParent()).setVisibility(View.GONE);
+        if (addRomsButton != null) addRomsButton.setVisibility(View.GONE);
+        mGridView.setPadding(mGridView.getPaddingLeft(), mGridView.getPaddingLeft(),
+                mGridView.getPaddingRight(), mGridView.getPaddingLeft());
+        hideGameNamesWithArt = true;
+
+        // Library | line | recently played
+        ViewGroup parent = (ViewGroup) mGridView.getParent();
+        int index = parent.indexOfChild(mGridView);
+        ViewGroup.LayoutParams gridLp = mGridView.getLayoutParams();
+        parent.removeView(mGridView);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setBackgroundColor(getResources().getColor(R.color.mupen_black, getTheme()));
+        row.addView(mGridView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+
+        mRecentDivider = new View(this);
+        mRecentDivider.setBackgroundColor(0x40FFFFFF);
+        LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(
+                Math.max(1, Math.round(2 * dp)), ViewGroup.LayoutParams.MATCH_PARENT);
+        dividerLp.setMargins(0, Math.round(16 * dp), 0, Math.round(16 * dp));
+        row.addView(mRecentDivider, dividerLp);
+
+        mRecentView = new RecyclerView(this);
+        mRecentView.setPadding(mGridView.getPaddingLeft(), mGridView.getPaddingTop(),
+                mGridView.getPaddingRight(), mGridView.getPaddingBottom());
+        mRecentView.setClipToPadding(false);
+        mRecentView.setFocusable(false);
+        row.addView(mRecentView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        parent.addView(row, index, gridLp);
+
+        // The second screen's home: buttons + popups instead of the long menu list
+        mHomePanel = new GalleryHomePanel(this, mDrawerList.getMenu());
+        ViewGroup drawer = (ViewGroup) mDrawerList.getParent();
+        drawer.addView(mHomePanel, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        mDrawerList.setReplacementView(mHomePanel);
+    }
+
+    private void showRecentPane(List<GalleryItem> items, int columns)
+    {
+        if (mRecentView == null) return;
+        if (items == null || columns <= 0) {
+            mRecentView.setVisibility(View.GONE);
+            mRecentDivider.setVisibility(View.GONE);
+            mRecentView.setAdapter(null);
+            return;
+        }
+        mRecentView.setVisibility(View.VISIBLE);
+        mRecentDivider.setVisibility(View.VISIBLE);
+
+        final List<GalleryItem> finalItems = items;
+        GridLayoutManager manager = new GridLayoutManager(this, columns);
+        manager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
+            @Override
+            public int getSpanSize(int position) {
+                return finalItems.get(position).isHeading ? columns : 1;
+            }
+        });
+        mRecentView.setLayoutManager(manager);
+
+        int width = columns * (galleryWidth + galleryHalfSpacing * 2)
+                + mRecentView.getPaddingLeft() + mRecentView.getPaddingRight();
+        ViewGroup.LayoutParams lp = mRecentView.getLayoutParams();
+        if (lp.width != width) {
+            lp.width = width;
+            mRecentView.setLayoutParams(lp);
+        }
+        mRecentView.setAdapter(new GalleryItem.Adapter(this, items));
+    }
+
+    /** Search typed on the second screen. */
+    public void setSearchQueryFromSecondScreen(String query)
+    {
+        mSearchQuery = query == null ? "" : query;
+        refreshGridAsync();
+    }
+
+    /** "Exit" on the second screen: closes the app on both screens. */
+    public void exitFromSecondScreen()
+    {
+        finishAndRemoveTask();
     }
 
     public void onOpenDrawerButtonClicked(View view)
