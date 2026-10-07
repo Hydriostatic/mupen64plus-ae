@@ -32,11 +32,13 @@ jobs:
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
 
     - name: Install build dependencies
+      timeout-minutes: 10
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends file gawk
 
     - name: Build APK
+      timeout-minutes: 60
       run: |
         chmod +x gradlew
         set -o pipefail
