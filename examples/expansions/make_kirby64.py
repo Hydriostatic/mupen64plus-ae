@@ -402,6 +402,22 @@ def outline_of(im, rgb, th=1):
             if edge: out.putpixel((x, y), rgb + (255,))
     return out
 SH_BIG_HOLE = outline_of(SH_BIG, (96, 70, 210), 2)
+def chalk_grass(w, h, seed=21):
+    """The green behind the notebook, redrawn as chalk: diagonal strokes in the greens of the game's
+    grass texture (0x207), with gaps where a lighter ground shows through."""
+    rnd = random.Random(seed)
+    greens = sorted({TEX_GRASS.getpixel((x, y))[:3] for y in range(0, 64, 3) for x in range(0, 64, 3)},
+                    key=lambda c: sum(c))
+    greens = greens[len(greens) // 6: -max(1, len(greens) // 6)] or greens
+    out = Image.new('RGBA', (w, h), (196, 232, 150, 255))                  # light ground in the gaps
+    for _ in range(w * h // 4):
+        x, y = rnd.randrange(-6, w), rnd.randrange(0, h + 6)
+        col = rnd.choice(greens); n = rnd.randint(3, 8)
+        for k in range(n):
+            px, py = x + k, y - k
+            if 0 <= px < w and 0 <= py < h and rnd.random() > .15:
+                out.putpixel((px, py), col + (255,))
+    return out
 def crayon_strip(w, h, seed, shade=1.0):
     """A green strip drawn in chalk: diagonal strokes of slightly different greens, gaps where the
     paper shows through, ragged edges and a heavier rim, like the game's hand-drawn strip."""
@@ -431,7 +447,7 @@ def crayon_strip(w, h, seed, shade=1.0):
 STRIP = (150, 214, 158, 255); STRIP_DARK = (104, 170, 112, 255)
 def stage_select_bg(boss):
     T = Image.new('RGBA', (IW, IH))
-    tile(T, TEX_GRASS, (0, 0, IW, IH))
+    T.paste(chalk_grass(IW, IH), (0, 0))                                       # grass, drawn in chalk
     ox, oy = -IX, -IY
     tile(T, TEX_CARD, (ox + 12, oy + 10, ox + 240, oy + 196))                  # cardboard back
     for k, (dx, dy) in enumerate(((5, 6), (2, 3))):                            # page stack
@@ -446,10 +462,10 @@ def stage_select_bg(boss):
         d.ellipse((x, oy + 19, x + 5, oy + 22), fill=(150, 150, 150, 255))
         d.arc((x - 1, oy + 9, x + 6, oy + 22), 180, 360, fill=(220, 40, 30, 255), width=2)
     T.alpha_composite(level_word, (ox + X0 + 132, oy + 32))
-    if boss:                                                                   # crayon strip behind the boss name
-        rounded(d, ox + 82, oy + 72, 84, 17, (46, 96, 56, 255))                 # solid base so the name reads
-        T.alpha_composite(crayon_strip(88, 21, 5, .5), (ox + 80, oy + 70))
-    T.alpha_composite(crayon_strip(160, 50, 11), (ox + 44, oy + 114))         # green crayon strip
+    if boss:                                                                   # strip behind the boss name
+        rounded(d, ox + 80, oy + 70, 88, 21, (60, 120, 70, 255))
+    rounded(d, ox + 44, oy + 114, 160, 50, STRIP_DARK)                          # green strip
+    rounded(d, ox + 45, oy + 115, 158, 48, STRIP)
     for x in ([SS_SH_X[1]] if boss else SS_SH_X):
         T.alpha_composite(SH_BIG_HOLE, (ox + x, oy + 125))
     return T
