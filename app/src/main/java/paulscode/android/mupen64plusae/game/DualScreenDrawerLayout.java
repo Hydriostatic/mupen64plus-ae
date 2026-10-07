@@ -127,7 +127,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private final Runnable mLeftAppCheck = new Runnable() {
         @Override
         public void run() {
-            if (SecondScreen.sSystemPickerOpen) return;
+            if (SecondScreen.sSystemPickerOpen || hostFinishing()) return;
             if (mHostVisible || mMenuScreen == null) return;
             Boolean appVisible = SecondScreen.isAppVisible(getContext());
             if (appVisible == null) {
@@ -149,8 +149,15 @@ public class DualScreenDrawerLayout extends DrawerLayout
      * The second screen was covered. If it wasn't by the app itself (a page opened there, the
      * game's own second screen) the user pressed Home there: both screens go home together.
      */
+    /** The host screen is closing (e.g. Exit from the game): nothing is "leaving the app". */
+    private boolean hostFinishing()
+    {
+        Activity a = getActivity();
+        return a == null || a.isFinishing() || a.isDestroyed();
+    }
+
     private final Runnable mCoveredCheck = () -> {
-        if (SecondScreen.sSystemPickerOpen) return;
+        if (SecondScreen.sSystemPickerOpen || hostFinishing()) return;
         if (!mHostVisible || mMenuScreen == null || mMenuScreen.isFinishing() || mMenuScreen.isShownToUser()) return;
         Boolean covered = SecondScreen.isMenuCoveredByOtherApp(getContext(), mMenuScreen.getTaskId());
         if (covered != null && covered) {
@@ -212,6 +219,11 @@ public class DualScreenDrawerLayout extends DrawerLayout
 
     private void leaveApp(boolean sendMainScreenHome)
     {
+        if (hostFinishing()) {
+            // Closing this screen (e.g. Exit from the game) is not the user going home
+            finishMenuScreen();
+            return;
+        }
         finishMenuScreen();
         Context ctx = getContext();
         Intent intent = new Intent(ACTION_APP_LEFT);
@@ -361,7 +373,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
         status("opening menu on screen " + target.getDisplayId() + " (" + target.getName() + ")");
         mTargetDisplayId = target.getDisplayId();
         mSecondScreenActive = true;
-        mMenuOpen = wasOpen;
+        mMenuOpen = wasOpen && !mInGame;
         mControllerOnMenu = false;
 
         launchMenuScreen();
@@ -623,6 +635,9 @@ public class DualScreenDrawerLayout extends DrawerLayout
             return;
         }
         if (mMenuOpen) return;
+        // In a game the menu is always on the second screen: "opening" it must not pause the
+        // game (GameActivity pauses on onDrawerOpened, and the sound stops with it)
+        if (mInGame) return;
 
         mMenuOpen = true;
         if (mMenuScreen != null) mMenuScreen.setMenuOpen(true);

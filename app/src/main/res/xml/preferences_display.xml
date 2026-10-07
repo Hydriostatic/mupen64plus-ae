@@ -57,7 +57,7 @@
         android:defaultValue="100"
         android:key="displayZoomSeek"
         android:title="@string/displayZoom_title"
-        mupen64:maximumValue="130"
+        mupen64:maximumValue="150"
         mupen64:minimumValue="70"
         mupen64:stepSize="1"
         mupen64:units="%" />

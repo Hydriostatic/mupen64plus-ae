@@ -201,10 +201,9 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
                         mDrawerLayout.closeDrawer( GravityCompat.START );
                     }
 
-                    if(mGameStartedExternally)
-                    {
-                        finishAffinity();
-                    }
+                    // M64-DS: Exit from a game always comes back to the game list (also when the
+                    // game was started from a shortcut or another app)
+                    mGameStartedExternally = false;
                 }
             });
 

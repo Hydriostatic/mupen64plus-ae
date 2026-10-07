@@ -22,7 +22,7 @@
         android:icon="@drawable/ic_display"
         android:key="displayZoomSeekGame"
         android:title="@string/displayZoom_title"
-        mupen64:maximumValue="130"
+        mupen64:maximumValue="150"
         mupen64:minimumValue="100"
         mupen64:stepSize="1"
         mupen64:units="%" />

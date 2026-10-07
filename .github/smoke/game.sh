@@ -29,9 +29,13 @@ adb push rom/test.n64 /sdcard/Download/test.n64
 adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1; sleep 30; shots first_start
 adb logcat -c
 adb shell am start -a android.intent.action.VIEW -d file:///sdcard/Download/test.n64 -t application/octet-stream -n $PKG/paulscode.android.mupen64plusae.SplashActivity
-sleep 35; shots game_running
+sleep 75; shots game_running
+sleep 10; shots game_running_later
 adb shell input -d "$SECOND" tap 540 900; sleep 6; shots after_bottom_tap
-adb shell input -d "$SECOND" tap 540 200; sleep 6; shots after_bottom_tap2
-adb shell input tap 540 960; sleep 6; shots after_top_tap
-adb shell input keyevent KEYCODE_BACK; sleep 6; shots back_key
+adb shell input tap 960 540; sleep 6; shots after_top_tap
+# Exit from the in-game menu on the bottom screen (first row)
+adb shell input -d "$SECOND" tap 300 150; sleep 6; shots exit_tapped
+adb shell input -d "$SECOND" tap 300 150; sleep 6; shots exit_tapped_again
+adb shell input keyevent KEYCODE_DPAD_RIGHT; adb shell input keyevent KEYCODE_ENTER; sleep 10; shots exit_confirm_key
+sleep 10; shots after_exit
 exit 0

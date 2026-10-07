@@ -540,7 +540,8 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
             @Override
             public void onDrawerOpened(@NonNull View arg0)
             {
-                if(mCoreFragment != null)
+                // With the menu on the second screen the game keeps running (and its sound)
+                if(mCoreFragment != null && !mDrawerLayout.isUsingSecondScreen())
                 {
                     mCoreFragment.pauseEmulator();
                 }
@@ -696,7 +697,7 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
             mGameSidebar.setBackground(new DrawerDrawable(mGlobalPrefs.displayActionBarTransparency));
         }
 
-        if(mDrawerOpenState)
+        if(mDrawerOpenState && !mDrawerLayout.isUsingSecondScreen())
         {
             if(mCoreFragment != null)
             {
@@ -1523,7 +1524,8 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         if (mCoreFragment.hasServiceStarted()) {
             mGameSurface.setSurfaceTexture(mCoreFragment.getSurfaceTexture());
 
-            if (mDrawerLayout.isDrawerOpen(GravityCompat.START) || mDrawerOpenState) {
+            if (!mDrawerLayout.isUsingSecondScreen() &&
+                    (mDrawerLayout.isDrawerOpen(GravityCompat.START) || mDrawerOpenState)) {
                 mCoreFragment.pauseEmulator();
             } else {
                 mCoreFragment.resumeEmulator();
