@@ -2,6 +2,9 @@ name: Mupen64Plus-AE
 
 on:
   push:
+    paths-ignore:
+      - '.github/workflows/smoke.yml'
+      - '.github/smoke/**'
   pull_request:
   workflow_dispatch:
 
