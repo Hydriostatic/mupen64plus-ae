@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- M64-DS: each row is a raised paper card (the inner layout follows the row's pressed/focused state) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+<LinearLayout
+    android:background="@drawable/n64_card"
+    android:duplicateParentState="true"
+    android:paddingBottom="8dp"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
@@ -11,6 +22,8 @@
 
     <ImageView
         android:id="@+id/icon"
+        android:background="@drawable/n64_icon_well"
+        android:padding="6dp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
@@ -31,6 +44,7 @@
 
         <TextView
             android:id="@+id/text1"
+            android:fontFamily="@font/lilita_one"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:ellipsize="marquee"
@@ -59,3 +73,4 @@
         android:orientation="vertical" />
 
 </LinearLayout>
+</FrameLayout>

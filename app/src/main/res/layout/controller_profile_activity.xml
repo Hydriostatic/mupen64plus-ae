@@ -108,7 +108,7 @@
                 android:focusableInTouchMode="false"
                 android:text="@string/inputMapActivity_dummyFeedback"
                 android:textAppearance="?android:attr/textAppearanceMedium"
-                android:textColor="@android:color/primary_text_dark_nodisable" />
+                android:textColor="@color/n64_ink" />
 
             <include
                 android:id="@+id/include_all_special_keys"

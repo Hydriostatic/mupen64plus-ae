@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- M64-DS: raised paper card (setting rows, list items). Pressed sinks, focused is highlighted. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+            <item android:top="4dp"><shape><solid android:color="#FFC9BC9A" /><corners android:radius="14dp" /><stroke android:width="2dp" android:color="#FF161628" /></shape></item>
+            <item android:bottom="1dp"><shape><solid android:color="#FFF3E2B4" /><corners android:radius="14dp" /><stroke android:width="2dp" android:color="#FF161628" /></shape></item>
+        </layer-list>
+    </item>
+    <item android:state_focused="true">
+        <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+            <item android:top="4dp"><shape><solid android:color="#FFBE8200" /><corners android:radius="14dp" /><stroke android:width="2dp" android:color="#FF161628" /></shape></item>
+            <item android:bottom="5dp"><shape><solid android:color="#FFFFE58A" /><corners android:radius="14dp" /><stroke android:width="3dp" android:color="#FF161628" /></shape></item>
+        </layer-list>
+    </item>
+    <item android:state_activated="true">
+        <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+            <item android:top="4dp"><shape><solid android:color="#FFBE8200" /><corners android:radius="14dp" /><stroke android:width="2dp" android:color="#FF161628" /></shape></item>
+            <item android:bottom="5dp"><shape><solid android:color="#FFFFE58A" /><corners android:radius="14dp" /><stroke android:width="2dp" android:color="#FF161628" /></shape></item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+            <item android:top="4dp"><shape><solid android:color="#FFC9BC9A" /><corners android:radius="14dp" /><stroke android:width="2dp" android:color="#FF161628" /></shape></item>
+            <item android:bottom="5dp"><shape><solid android:color="#FFFFF8E6" /><corners android:radius="14dp" /><stroke android:width="2dp" android:color="#FF161628" /></shape></item>
+        </layer-list>
+    </item>
+</selector>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- M64-DS: dark rounded well behind the (white) icons on light cards -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#FF1B1B28" />
+    <corners android:radius="10dp" />
+</shape>

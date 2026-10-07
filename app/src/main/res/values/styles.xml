@@ -74,13 +74,176 @@
         <item name="android:scrollbars">none</item>
     </style>
 
-    <style name="Theme.Mupen64plusaeTheme" parent="MupenTheme_Dark">
+    <!-- M64-DS: every menu and settings page uses the bright theme below -->
+    <style name="Theme.Mupen64plusaeTheme" parent="N64">
     </style>
 
-    <style name="Theme.Mupen64plusaeTheme.NoActionBar" parent="MupenTheme_Dark.NoActionBar">
+    <style name="Theme.Mupen64plusaeTheme.NoActionBar" parent="N64.NoActionBar">
     </style>
 
     <style name="Theme.Mupen64plusaeTheme.Game" parent="@style/Theme.AppCompat.Black">
+    </style>
+
+    <!-- ============================================================================== -->
+    <!-- M64-DS: bright cartridge-era theme for every menu and settings page            -->
+    <!-- ============================================================================== -->
+    <style name="N64.Base" parent="Theme.AppCompat.Light">
+        <item name="colorPrimary">@color/n64_label</item>
+        <item name="colorPrimaryDark">@color/n64_label</item>
+        <item name="colorAccent">@color/n64_blue</item>
+        <item name="colorControlNormal">@color/n64_ink</item>
+        <item name="colorControlActivated">@color/n64_green</item>
+        <item name="colorControlHighlight">#33285FE1</item>
+        <item name="colorSwitchThumbNormal">#FFE5DCC4</item>
+        <item name="android:windowBackground">@drawable/n64_window_bg</item>
+        <item name="android:colorBackground">@color/n64_cream</item>
+        <item name="android:textColorPrimary">@color/n64_ink</item>
+        <item name="android:textColorSecondary">@color/n64_ink_soft</item>
+        <item name="android:textColor">@color/n64_ink</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:statusBarColor">@color/n64_label</item>
+        <item name="android:navigationBarColor">@color/n64_label</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="actionBarStyle">@style/N64.ActionBar</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.AppCompat.Dark.ActionBar</item>
+        <item name="toolbarStyle">@style/N64.Toolbar</item>
+        <item name="preferenceTheme">@style/N64.PreferenceTheme</item>
+        <item name="alertDialogTheme">@style/N64.Dialog</item>
+        <item name="android:alertDialogTheme">@style/N64.Dialog</item>
+        <item name="android:listViewStyle">@style/N64.ListView</item>
+        <item name="buttonStyle">@style/N64.Button</item>
+        <item name="android:buttonStyle">@style/N64.Button</item>
+        <item name="android:popupMenuStyle">@style/N64.PopupMenu</item>
+        <item name="popupMenuStyle">@style/N64.PopupMenu</item>
+    </style>
+
+    <style name="N64" parent="N64.Base" />
+
+    <style name="N64.NoActionBar" parent="N64.Base">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <style name="N64.ActionBar" parent="Widget.AppCompat.ActionBar.Solid">
+        <item name="background">@drawable/n64_toolbar_bg</item>
+        <item name="titleTextStyle">@style/N64.ActionBarTitle</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <style name="N64.ActionBarTitle" parent="TextAppearance.AppCompat.Widget.ActionBar.Title">
+        <item name="android:fontFamily">@font/lilita_one</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="android:textSize">22sp</item>
+    </style>
+
+    <style name="N64.Toolbar" parent="Widget.AppCompat.Toolbar">
+        <item name="titleTextAppearance">@style/N64.ActionBarTitle</item>
+        <item name="titleTextColor">#FFFFFFFF</item>
+        <item name="theme">@style/ThemeOverlay.AppCompat.Dark.ActionBar</item>
+    </style>
+
+    <style name="N64.ListView" parent="Widget.AppCompat.ListView">
+        <item name="android:divider">@android:color/transparent</item>
+        <item name="android:dividerHeight">0dp</item>
+        <item name="android:listSelector">@android:color/transparent</item>
+        <item name="android:drawSelectorOnTop">false</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:clipToPadding">false</item>
+    </style>
+
+    <style name="N64.Button" parent="Widget.AppCompat.Button">
+        <item name="android:fontFamily">@font/lilita_one</item>
+        <item name="android:textColor">@color/n64_ink</item>
+        <item name="android:background">@drawable/n64_card</item>
+        <item name="android:paddingStart">18dp</item>
+        <item name="android:paddingEnd">18dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <style name="N64.PopupMenu" parent="Widget.AppCompat.Light.PopupMenu">
+        <item name="android:popupBackground">@drawable/n64_dialog_bg</item>
+    </style>
+
+    <style name="N64.Dialog" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/n64_dialog_bg</item>
+        <item name="colorAccent">@color/n64_blue</item>
+        <item name="colorControlActivated">@color/n64_green</item>
+        <item name="android:textColorPrimary">@color/n64_ink</item>
+        <item name="android:textColor">@color/n64_ink</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="buttonBarPositiveButtonStyle">@style/N64.DialogButton.Positive</item>
+        <item name="buttonBarNegativeButtonStyle">@style/N64.DialogButton</item>
+        <item name="buttonBarNeutralButtonStyle">@style/N64.DialogButton</item>
+        <item name="windowTitleStyle">@style/N64.DialogTitle</item>
+        <item name="android:windowTitleStyle">@style/N64.DialogTitle</item>
+    </style>
+
+    <style name="N64.DialogTitle" parent="RtlOverlay.DialogWindowTitle.AppCompat">
+        <item name="android:textAppearance">@style/N64.DialogTitleText</item>
+    </style>
+
+    <style name="N64.DialogTitleText" parent="TextAppearance.AppCompat.Title">
+        <item name="android:fontFamily">@font/lilita_one</item>
+        <item name="android:textColor">@color/n64_ink</item>
+        <item name="android:textSize">22sp</item>
+    </style>
+
+    <style name="N64.DialogButton" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
+        <item name="android:fontFamily">@font/lilita_one</item>
+        <item name="android:textColor">@color/n64_blue</item>
+        <item name="android:textSize">17sp</item>
+    </style>
+
+    <style name="N64.DialogButton.Positive">
+        <item name="android:textColor">@color/n64_green</item>
+    </style>
+
+    <!-- Settings rows as raised paper cards -->
+    <style name="N64.PreferenceTheme" parent="PreferenceThemeOverlay">
+        <item name="preferenceStyle">@style/N64.Preference</item>
+        <item name="preferenceCategoryStyle">@style/N64.Preference.Category</item>
+        <item name="preferenceScreenStyle">@style/N64.Preference.Screen</item>
+        <item name="checkBoxPreferenceStyle">@style/N64.Preference.CheckBox</item>
+        <item name="switchPreferenceCompatStyle">@style/N64.Preference.SwitchCompat</item>
+        <item name="switchPreferenceStyle">@style/N64.Preference.Switch</item>
+        <item name="dialogPreferenceStyle">@style/N64.Preference.Dialog</item>
+        <item name="editTextPreferenceStyle">@style/N64.Preference.EditText</item>
+        <item name="dropdownPreferenceStyle">@style/N64.Preference.Dropdown</item>
+    </style>
+    <style name="N64.Preference" parent="Preference.Material">
+        <item name="android:layout">@layout/n64_preference</item>
+    </style>
+    <style name="N64.Preference.Category" parent="Preference.Category.Material">
+        <item name="android:layout">@layout/n64_preference_category</item>
+    </style>
+    <style name="N64.Preference.Screen" parent="Preference.PreferenceScreen.Material">
+        <item name="android:layout">@layout/n64_preference</item>
+    </style>
+    <style name="N64.Preference.CheckBox" parent="Preference.CheckBoxPreference.Material">
+        <item name="android:layout">@layout/n64_preference</item>
+    </style>
+    <style name="N64.Preference.SwitchCompat" parent="Preference.SwitchPreferenceCompat.Material">
+        <item name="android:layout">@layout/n64_preference</item>
+    </style>
+    <style name="N64.Preference.Switch" parent="Preference.SwitchPreference.Material">
+        <item name="android:layout">@layout/n64_preference</item>
+    </style>
+    <style name="N64.Preference.Dialog" parent="Preference.DialogPreference.Material">
+        <item name="android:layout">@layout/n64_preference</item>
+    </style>
+    <style name="N64.Preference.EditText" parent="Preference.DialogPreference.EditTextPreference.Material">
+        <item name="android:layout">@layout/n64_preference</item>
+    </style>
+    <style name="N64.Preference.Dropdown" parent="Preference.DropDown.Material">
+        <item name="android:layout">@layout/n64_preference</item>
+    </style>
+
+    <!-- The game list on the main screen keeps the original dark look -->
+    <style name="Theme.Mupen64plusaeTheme.Gallery" parent="MupenTheme_Dark.NoActionBar">
     </style>
 
 </resources>

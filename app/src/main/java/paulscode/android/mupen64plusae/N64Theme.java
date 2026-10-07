@@ -557,7 +557,21 @@ public final class N64Theme
         for (int pass = 0; pass < 2; pass++) {
             float e = pass == 0 ? edge : 0;
             p.setColor(pass == 0 ? INK : 0xFFFFFFFF);
-            if ("plus".equals(kind)) {
+            if ("update".equals(kind)) {
+                // circular arrow
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeCap(Paint.Cap.ROUND);
+                p.setStrokeWidth(3.4f * d + 2 * e);
+                float r = s * 0.34f;
+                c.drawArc(new RectF(cx - r, cx - r, cx + r, cx + r), -30, 300, false, p);
+                p.setStyle(Paint.Style.FILL);
+                double a = Math.toRadians(-30);
+                float ax = cx + r * (float) Math.cos(a), ay = cx + r * (float) Math.sin(a), k = s * 0.2f + e * 1.4f;
+                Path tri = new Path();
+                tri.moveTo(ax - k, ay - k * 0.2f); tri.lineTo(ax + k * 0.9f, ay - k * 0.35f); tri.lineTo(ax + k * 0.15f, ay + k * 0.85f);
+                tri.close();
+                c.drawPath(tri, p);
+            } else if ("plus".equals(kind)) {
                 p.setStyle(Paint.Style.FILL);
                 float t = s * 0.13f + e, L = s * 0.4f + e;
                 c.drawRoundRect(new RectF(cx - L, cx - t, cx + L, cx + t), 2 * d, 2 * d, p);

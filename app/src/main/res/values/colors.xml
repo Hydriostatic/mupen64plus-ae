@@ -30,4 +30,14 @@
     <color name="dim_foreground_disabled_material_dark">#80bebebe</color>
 
 
+    <!-- M64-DS theme -->
+    <color name="n64_ink">#FF161628</color>
+    <color name="n64_ink_soft">#FF5A5468</color>
+    <color name="n64_cream">#FFF5ECD6</color>
+    <color name="n64_paper">#FFFFF8E6</color>
+    <color name="n64_blue">#FF285FE1</color>
+    <color name="n64_red">#FFE6282D</color>
+    <color name="n64_yellow">#FFFFCD1E</color>
+    <color name="n64_green">#FF28AF46</color>
+    <color name="n64_label">#FF14141A</color>
 </resources>

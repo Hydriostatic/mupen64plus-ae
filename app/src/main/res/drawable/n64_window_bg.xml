@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- M64-DS: cream background with confetti (menus and settings pages) -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/n64_confetti_tile"
+    android:tileMode="repeat" />

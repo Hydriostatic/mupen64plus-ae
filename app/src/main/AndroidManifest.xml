@@ -23,6 +23,8 @@
 
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- M64-DS: "Update" installs newer versions downloaded from GitHub (Android asks first) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -105,7 +107,7 @@
             android:exported="false"
             android:label="@string/GalleryActivity_title"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.Mupen64plusaeTheme.NoActionBar" />
+            android:theme="@style/Theme.Mupen64plusaeTheme.Gallery" />
         <activity
             android:name="paulscode.android.mupen64plusae.ScanRomsActivity"
             android:exported="false"

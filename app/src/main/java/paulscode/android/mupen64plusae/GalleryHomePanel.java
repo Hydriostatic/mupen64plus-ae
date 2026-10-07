@@ -163,6 +163,24 @@ public class GalleryHomePanel extends FrameLayout
         buttons.add(optionButton(ctx, expIcon, ctx.getString(R.string.expansions_title), buttons.size(), v -> showExpansions()));
         Drawable exitIcon = N64Theme.outlinedShape(ctx, "power", dp(40));
         buttons.add(optionButton(ctx, exitIcon, ctx.getString(R.string.secondScreen_exit), buttons.size(), v -> mActivity.exitFromSecondScreen()));
+        // Update (from GitHub), with a red badge when a newer version is out
+        Drawable updIcon = N64Theme.outlinedShape(ctx, "update", dp(40));
+        View upd = optionButton(ctx, updIcon, "Update", buttons.size(), v -> showUpdate());
+        FrameLayout updWrap = new FrameLayout(ctx);
+        updWrap.addView(upd, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        mUpdateBadge = new N64Theme.OutlineTextView(ctx, 0, N64Theme.INK);
+        ((N64Theme.OutlineTextView) mUpdateBadge).setText("1");
+        ((N64Theme.OutlineTextView) mUpdateBadge).setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        GradientDrawable badge = new GradientDrawable();
+        badge.setShape(GradientDrawable.OVAL);
+        badge.setColor(N64Theme.RED[0]);
+        badge.setStroke(dp(2), N64Theme.INK);
+        mUpdateBadge.setBackground(badge);
+        mUpdateBadge.setVisibility(View.GONE);
+        LayoutParams badgeLp = new LayoutParams(dp(26), dp(26), Gravity.TOP | Gravity.END);
+        badgeLp.setMargins(0, dp(1), dp(2), 0);
+        updWrap.addView(mUpdateBadge, badgeLp);
+        buttons.add(updWrap);
 
         final int columns = 3;
         LinearLayout row = null;
@@ -183,6 +201,10 @@ public class GalleryHomePanel extends FrameLayout
             row.addView(new View(ctx), lp);
         }
         if (!buttons.isEmpty()) mFirstButton = buttons.get(0);
+
+        // Look for a newer version on GitHub once per app start
+        if (!Updater.checked()) Updater.check((latest, error) -> refreshUpdateBadge());
+        else refreshUpdateBadge();
 
         // Floating buttons: search + add ROMs, bottom right (same place as on the main screen)
         LinearLayout fabs = new LinearLayout(ctx);
@@ -325,6 +347,7 @@ public class GalleryHomePanel extends FrameLayout
     private void showPopup(MenuItem group)
     {
         mShowingExpansions = false;
+        mShowingUpdate = false;
         Context ctx = getContext();
         mPopupTitle.setText(group.getTitle());
         mPopupList.removeAllViews();
@@ -351,6 +374,7 @@ public class GalleryHomePanel extends FrameLayout
         mPopupTitle.setText(R.string.expansions_title);
         mPopupList.removeAllViews();
         mShowingExpansions = true;
+        mShowingUpdate = false;
 
         N64Theme.OutlineTextView importRow = new N64Theme.OutlineTextView(ctx, 3f, N64Theme.INK);
         importRow.setCentered(false);
@@ -418,8 +442,147 @@ public class GalleryHomePanel extends FrameLayout
         return lp;
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // Update from GitHub
+    // ---------------------------------------------------------------------------------------------
+
+    private View mUpdateBadge;
+    private boolean mShowingUpdate, mDownloading;
+    private String mUpdateStatus;
+
+    private void refreshUpdateBadge()
+    {
+        if (mUpdateBadge != null) mUpdateBadge.setVisibility(Updater.updateAvailable(getContext()) ? View.VISIBLE : View.GONE);
+        if (mShowingUpdate && mPopup.getVisibility() == View.VISIBLE) showUpdate();
+    }
+
+    private void showUpdate()
+    {
+        Context ctx = getContext();
+        mShowingExpansions = false;
+        mShowingUpdate = true;
+        mPopupTitle.setText("Update");
+        mPopupList.removeAllViews();
+        String mine = Updater.installedVersion(ctx);
+        Updater.Release latest = Updater.latest();
+
+        String line1, line2, action;
+        Runnable onAction;
+        int[] color = N64Theme.GREEN;
+        if (mDownloading) {
+            line1 = mUpdateStatus != null ? mUpdateStatus : "Downloading…";
+            line2 = "M64-DS " + (latest != null ? latest.version : "") + " from GitHub";
+            action = null; onAction = null;
+        } else if (!Updater.checked()) {
+            line1 = "Checking GitHub…";
+            line2 = "You have M64-DS " + mine;
+            action = null; onAction = null;
+            Updater.check((l, e) -> { mUpdateStatus = e != null ? "Couldn't check: " + e : null; refreshUpdateBadge(); });
+        } else if (latest == null) {
+            line1 = mUpdateStatus != null ? mUpdateStatus : "Couldn't reach GitHub.";
+            line2 = "You have M64-DS " + mine + " · check your connection";
+            action = "Try again"; color = N64Theme.BLUE;
+            onAction = () -> { mUpdateStatus = null; Updater.check((l, e) -> { mUpdateStatus = e != null ? "Couldn't check: " + e : null; refreshUpdateBadge(); }); showChecking(); };
+        } else if (Updater.newer(latest.version, mine)) {
+            line1 = mUpdateStatus != null ? mUpdateStatus : "New version available: M64-DS " + latest.version;
+            line2 = "You have " + mine + " · from GitHub (" + Updater.REPO.split("/")[0] + ")";
+            action = "Download and install";
+            onAction = () -> startDownload(latest);
+        } else {
+            line1 = "You have the latest version.";
+            line2 = "M64-DS " + mine;
+            action = "Check again"; color = N64Theme.BLUE;
+            onAction = () -> { mUpdateStatus = null; Updater.check((l, e) -> { mUpdateStatus = e != null ? "Couldn't check: " + e : null; refreshUpdateBadge(); }); showChecking(); };
+        }
+
+        TextView t1 = label(ctx, line1, 17, TEXT, true);
+        t1.setPadding(dp(14), dp(6), dp(14), dp(2));
+        mPopupList.addView(t1, popupLp());
+        TextView t2 = label(ctx, line2, 13, MUTED, false);
+        t2.setPadding(dp(14), 0, dp(14), dp(10));
+        mPopupList.addView(t2, popupLp());
+        if (action != null) {
+            N64Theme.OutlineTextView b = new N64Theme.OutlineTextView(ctx, 3f, N64Theme.INK);
+            b.setText(action.toUpperCase(java.util.Locale.US));
+            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+            b.setTextColor(Color.WHITE);
+            N64Theme.ChunkyDrawable bg = new N64Theme.ChunkyDrawable(color, mDp, 14);
+            b.setBackground(bg);
+            b.setPadding(dp(18), dp(16), dp(18), dp(14) + bg.depth());
+            b.setFocusable(true);
+            b.setClickable(true);
+            final Runnable run = onAction;
+            b.setOnClickListener(v -> run.run());
+            mPopupList.addView(b, popupLp());
+            mPopup.setVisibility(View.VISIBLE);
+            b.requestFocus();
+        } else {
+            mPopup.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void showChecking()
+    {
+        mPopupList.removeAllViews();
+        TextView t1 = label(getContext(), "Checking GitHub…", 17, TEXT, true);
+        t1.setPadding(dp(14), dp(6), dp(14), dp(12));
+        mPopupList.addView(t1, popupLp());
+    }
+
+    private void startDownload(Updater.Release release)
+    {
+        mDownloading = true;
+        mUpdateStatus = "Downloading… 0%";
+        showUpdate();
+        Updater.download(mActivity, release, new Updater.DownloadListener() {
+            @Override public void onProgress(int percent)
+            {
+                mUpdateStatus = "Downloading… " + percent + "%";
+                if (mShowingUpdate && mPopup.getVisibility() == View.VISIBLE && mPopupList.getChildCount() > 0
+                        && mPopupList.getChildAt(0) instanceof TextView) {
+                    ((TextView) mPopupList.getChildAt(0)).setText(mUpdateStatus);
+                }
+            }
+            @Override public void onDone(java.io.File apk, String error)
+            {
+                mDownloading = false;
+                if (apk == null) {
+                    mUpdateStatus = "Download failed: " + error;
+                } else if (Updater.install(mActivity, apk)) {
+                    mUpdateStatus = "Opening the installer… tap Install.";
+                    mPendingApk = null;
+                } else {
+                    mUpdateStatus = "Allow \"Install unknown apps\" for M64-DS, then come back.";
+                    mPendingApk = apk;
+                }
+                showUpdate();
+            }
+        });
+    }
+
+    /** Downloaded, waiting for the "install unknown apps" permission. */
+    private java.io.File mPendingApk;
+
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus)
+    {
+        super.onWindowFocusChanged(hasWindowFocus);
+        if (!hasWindowFocus) return;
+        // Back from the system screen we opened (installer, permission, file picker)
+        SecondScreen.sSystemPickerOpen = false;
+        if (mPendingApk != null && mActivity.getPackageManager().canRequestPackageInstalls()) {
+            java.io.File apk = mPendingApk;
+            mPendingApk = null;
+            if (Updater.install(mActivity, apk)) {
+                mUpdateStatus = "Opening the installer… tap Install.";
+                if (mShowingUpdate) showUpdate();
+            }
+        }
+    }
+
     private void closePopup()
     {
+        mShowingUpdate = false;
         mShowingExpansions = false;
         mPopup.setVisibility(View.GONE);
     }
