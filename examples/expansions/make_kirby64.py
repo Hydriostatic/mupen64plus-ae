@@ -11,8 +11,8 @@ the game's colours and fonts. Nothing from the ROM is stored in this repo. The p
 Memory addresses come from the Kirby 64 decompilation (github.com/farisawan-2000/kirby64), which
 matches the USA ROM (sha1 6cea2d46b929a3bb347b060a77fccc83526fb855).
 """
-import io, json, struct, sys, zipfile, hashlib
-from PIL import Image, ImageDraw
+import io, json, random, struct, sys, zipfile, hashlib
+from PIL import Image, ImageDraw, ImageOps
 
 ROM_PATH = sys.argv[1]
 OUT = sys.argv[2] if len(sys.argv) > 2 else 'kirby64.exp'
@@ -142,24 +142,99 @@ ImageDraw.Draw(ring).rectangle((1, 1, 24, 44), fill=(0, 0, 0, 0))       # just t
 # ---------------------------------------------------------------------------------------------
 # Values (addresses from the decomp's symbol list)
 # ---------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------
+# Intro screens: the bottom screen follows the boot sequence (white behind the N64 and HAL logos,
+# the title screen's green checker behind the title). Bank 0 image 0x19 is the title background.
+# These layers are bigger than the canvas so they also cover the letterbox around it.
+# ---------------------------------------------------------------------------------------------
+title_bg = sprite(0, 0x19)                                   # 300x220, checker + logo
+tile = title_bg.crop((6, 118, 38, 150))                      # one clean 32x32 checker period
+IX, IY, IW, IH = -40, -40, GW + 80, GH + 80
+intro_title = Image.new('RGBA', (IW, IH))
+for ty in range(0, IH, 32):
+    for tx in range(0, IW, 32): intro_title.paste(tile, (tx, ty))
+intro_white = Image.new('RGBA', (IW, IH), (255, 255, 255, 255))
+
+def cork_board(src, IW, IH, rect, BX=10, BT=8, BB=6, seed=64):
+    """Cork texture everywhere, with the board's embossed frame around rect=(x,y,w,h).
+    Built from bank 3 image 0x02 (the 300x220 'Select File' board): the cork is re-assembled
+    from random 6x6 blocks of clean cork (no notes, sign or shadows), and the frame bands come
+    from the straight parts of the original border."""
+    rnd = random.Random(seed)
+    areas = [(14, 20, 40, 46), (258, 20, 284, 46), (102, 70, 108, 190), (192, 70, 198, 190), (282, 60, 286, 190)]
+    blocks = []
+    for (l, t, r, b) in areas:
+        for y in range(t, b - 5, 3):
+            for x in range(l, r - 5, 3):
+                blocks.append(src.crop((x, y, x + 6, y + 6)))
+    T = Image.new('RGBA', (IW, IH))
+    for y in range(0, IH, 6):
+        for x in range(0, IW, 6):
+            blk = rnd.choice(blocks)
+            if rnd.random() < .5: blk = ImageOps.mirror(blk)
+            if rnd.random() < .5: blk = ImageOps.flip(blk)
+            T.paste(blk, (x, y))
+    x0, y0, w, h = rect
+    SW, SH = src.size
+    top = src.crop((20, 0, 280, BT)); bottom = src.crop((20, SH - BB, 280, SH))
+    left = src.crop((0, BT, BX, SH - BB)); right = src.crop((SW - BX, BT, SW, SH - BB))
+    for x in range(x0 + BX, x0 + w - BX, top.width):
+        cw = min(top.width, x0 + w - BX - x)
+        T.paste(top.crop((0, 0, cw, BT)), (x, y0)); T.paste(bottom.crop((0, 0, cw, BB)), (x, y0 + h - BB))
+    for y in range(y0 + BT, y0 + h - BB, left.height):
+        ch = min(left.height, y0 + h - BB - y)
+        T.paste(left.crop((0, 0, BX, ch)), (x0, y)); T.paste(right.crop((0, 0, BX, ch)), (x0 + w - BX, y))
+    T.paste(src.crop((0, 0, BX, BT)), (x0, y0)); T.paste(src.crop((SW - BX, 0, SW, BT)), (x0 + w - BX, y0))
+    T.paste(src.crop((0, SH - BB, BX, SH)), (x0, y0 + h - BB)); T.paste(src.crop((SW - BX, SH - BB, SW, SH)), (x0 + w - BX, y0 + h - BB))
+    return T
+
+# File select (game state 10): the 'Select File' cork board (bank 3 image 0x02) without its sign
+# and notes, with the board's frame around the visible canvas
+intro_files = cork_board(sprite(3, 0x02), IW, IH, (-IX, -IY, GW, GH))
+
+# Fades: the game draws a full-screen rectangle (util.c) whose colour is at 0x800D6B28 and whose
+# opacity (0-255) is at 0x800D6B2E while its object (0x800D6B24) exists. The bottom screen draws
+# the same colour at the same opacity, in FADE_STEPS steps.
+FADE_STEPS = 16
+fade_img = {}
+for c, rgb in (("k", (0, 0, 0)), ("w", (255, 255, 255))):
+    for n in range(1, FADE_STEPS + 1):
+        fade_img["images/fade_%s%d.png" % (c, n)] = Image.new('RGBA', (IW, IH), rgb + (round(255 * n / FADE_STEPS),))
+
 values = {
-    "lives": {"type": "u32", "addr": "0x800D6E4C"},                     # gKirbyLives (0..100)
+    "lives": {"type": "u32", "addr": "0x800D6E88", "add": -1},          # what the HUD shows: its lives copy - 1
     "hp": {"type": "f32", "addr": "0x800D6E50"},                        # gKirbyHp (0..6)
     "stars": {"type": "u32", "addr": "0x800D6E60"},                     # gKirbyStars (30 = 1UP)
     "ability": {"type": "u32", "addr": "0x800D6E90"},                   # ability shown on the HUD
     "ability_l": {"type": "lookup", "value": "ability", "default": 0, "table": {str(k): v for k, v in AB_L.items()}},
     "ability_r": {"type": "lookup", "value": "ability", "default": 0, "table": {str(k): v for k, v in AB_R.items()}},
-    "world": {"type": "u32", "addr": "0x800D6B98"},                     # 0 Pop Star .. 5 Ripple Star, 6 Dark Star
-    "stage": {"type": "u32", "addr": "0x800D6B9C"},                     # 0-based stage in the world
+    "world": {"type": "u32", "addr": "0x800BE500"},                     # gGameState: 0 Pop Star .. 5 Ripple Star, 6 Dark Star
+    "stage": {"type": "u32", "addr": "0x800BE504"},                     # gGameState: 0-based stage in the world
     "is_dark": {"type": "lookup", "value": "world", "default": 0, "table": {"6": 1}},
     "has4": {"type": "lookup", "value": "world", "default": 1, "table": {"0": 0, "5": 0, "6": 0}},
-    "world_no": {"type": "u32", "addr": "0x800D6B98", "add": 1},
+    "world_no": {"type": "u32", "addr": "0x800BE500", "add": 1},
     # Shards: one byte per stage at 0x800D6BC8 + world*4 + stage, bits 0-2 = the 3 shards
     "stage_shards": {"type": "flags", "addr": "0x800D6BC8",
                      "bits": [(w * 4 + s) << 3 | b for w in range(6) for s in range(4 if w not in (0, 5) else 3) for b in range(3)]},
     "boss_shards": {"type": "flags", "addr": "0x800D6BC0", "bits": [w << 3 for w in range(6)]},
     "shards": {"type": "sum", "terms": ["stage_shards", "boss_shards", {"value": "intro_shards", "times": 1}]},
     "intro_shards": {"type": "const", "value": 2},
+    # gGameState: 1 = N64/HAL logos, 3/5/7/9 = title screen (between attract demos)
+    "scene": {"type": "u32", "addr": "0x800BE4F0"},
+    "is_logo": {"type": "lookup", "value": "scene", "default": 0, "table": {"1": 1}},
+    "is_title": {"type": "lookup", "value": "scene", "default": 0, "table": {"3": 1, "5": 1, "7": 1, "9": 1}},
+    "is_files": {"type": "lookup", "value": "scene", "default": 0, "table": {"10": 1}},
+    "fade_obj": {"type": "u32", "addr": "0x800D6B24"},
+    "fade_on": {"type": "lookup", "value": "fade_obj", "default": 1, "table": {"0": 0}},
+    "fade_alpha": {"type": "s16", "addr": "0x800D6B2E"},
+    "fade_lvl": {"type": "lookup", "value": "fade_alpha", "default": 0,
+                 "table": {str(a): round(a * FADE_STEPS / 255) for a in range(256)}},
+    "fade_r": {"type": "u8", "addr": "0x800D6B28"},
+    "fade_is_black": {"type": "lookup", "value": "fade_r", "default": 0, "table": {"0": 1}},
+    "fade_is_white": {"type": "lookup", "value": "fade_r", "default": 0, "table": {"255": 1}},
+    "zero": {"type": "const", "value": 0},
+    "fade_black": {"type": "select", "index": "fade_on", "options": ["zero", "fade_is_black"]},
+    "fade_white": {"type": "select", "index": "fade_on", "options": ["zero", "fade_is_white"]},
 }
 for k in range(4):
     values["cur%d" % k] = {"type": "lookup", "value": "stage", "default": 0, "table": {str(k): 1}}
@@ -185,6 +260,208 @@ for k in range(4):
     for j, (sx, sy) in enumerate(SHARD_POS):
         L.append({"image": "icons/shard.png", "x": bx + sx, "y": Y_ABIL + 1 + sy, "show": "s%d_%d" % (k, j), "hide": "is_dark"})
 L.append({"number": "shards", "glyphs": "digits/{c}.png", "advance": 20, "align": "right", "x": TOT_SLASH_X - 2, "y": Y_TOTAL + 9})
+L.append({"image": "images/intro_white.png", "x": IX, "y": IY, "show": "is_logo"})
+L.append({"image": "images/intro_title.png", "x": IX, "y": IY, "show": "is_title"})
+L.append({"image": "images/intro_files.png", "x": IX, "y": IY, "show": "is_files"})
+for col, val in (("k", "fade_black"), ("w", "fade_white")):
+    L.append({"pick": "fade_lvl", "show": val, "x": IX, "y": IY,
+              "images": {str(n): "images/fade_%s%d.png" % (col, n) for n in range(1, FADE_STEPS + 1)}})
+
+# ---------------------------------------------------------------------------------------------
+# Menus. Everything is cut from the game's own menu art (bank 3).
+#   File select (state 10): a big note in the selected save's colour (the 3 notes of the
+#   'Select File' board), with the save's title, its % and every crystal it has, per world.
+#   Stage select (state 12): world + level, the coloured 'N Stage' plate (or the boss name) and
+#   the selected stage's crystals, big.
+# Saves live at 0x800ECA08 + 0x58*n (gSaveBuffer1.files[n]); the cursor is saveCurrentFileNum.
+# In a save: +0x00 world (0x99999999 = empty), +0x10 %, +0x34 boss flags (1 byte per world),
+# +0x3C crystals (1 byte per stage, 4 per world, bits 0-2).
+# ---------------------------------------------------------------------------------------------
+board = sprite(3, 0x02)
+lvl_parts = sprite(3, 0x04)
+SH_BIG = lvl_parts.crop((16, 28, 43, 57))                        # the game's crystal icon (27x29)
+PCT = lvl_parts.crop((43, 30, 57, 46))                           # '%'
+def crystal_tint(im):
+    """The menu crystal is pale grey; collected ones are tinted to the in-game crystal blue
+    (dark outline -> blue -> pale cyan highlights), keeping the game's own shape and shading."""
+    out = Image.new('RGBA', im.size)
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = im.getpixel((x, y))
+            if not a: continue
+            l = (r + g + b) / 765
+            if l < .45: c = (30, 50, 140)
+            elif l < .7: c = (70, 140, 235)
+            elif l < .82: c = (130, 200, 255)
+            else: c = (210, 245, 255)
+            out.putpixel((x, y), c + (a,))
+    return out
+def crystal_hole(im, a=0.55):
+    """A missing crystal: the same shape as a brown silhouette (like an empty slot)."""
+    out = Image.new('RGBA', im.size)
+    for y in range(im.height):
+        for x in range(im.width):
+            if im.getpixel((x, y))[3]: out.putpixel((x, y), (110, 78, 30, int(255 * a)))
+    return out
+SH_BIG_ON, SH_BIG_DIM = crystal_tint(SH_BIG), crystal_hole(SH_BIG, .45)
+SH_SMALL, SH_SMALL_DIM = SHARD_ON, crystal_hole(SHARD_ON, .5)    # 7x10 pixel crystal for the rows
+def tint(im, rgb):
+    out = Image.new('RGBA', im.size)
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = im.getpixel((x, y))
+            if a:
+                l = (r + g + b) / 765
+                out.putpixel((x, y), tuple(int(c * (0.35 + 0.65 * (1 - l))) for c in rgb) + (a,))
+    return out
+WDIG = {d: tint(sprite(3, 0x05 + d), (96, 58, 14)) for d in range(10)}   # menu digits, in the notes' brown
+FILE_T = {k: sprite(3, 0x1D + k) for k in range(3)}              # brown 'File1/2/3'
+STAGE_PLATE = {k: sprite(3, 0x87 + k) for k in range(4)}         # coloured '1-4 Stage'
+BOSS_NAME = {0: 0x108, 1: 0x10A, 2: 0x10B, 3: 0x10C, 4: 0x10D, 5: 0x10F, 6: 0x110}
+BOSS_NAME = {w: sprite(3, i) for w, i in BOSS_NAME.items()}
+BOSS_STAGE = {0: 3, 1: 4, 2: 4, 3: 4, 4: 4, 5: 3}                # stage index of each world's boss
+STAGES = {w: (3 if w in (0, 5) else 4) for w in range(6)}
+
+NOTE_X = [20, 110, 200]
+def build_note(k, W, H, C=14):
+    """A bigger copy of note k of the Select File board: corners (with the pins), edges and paper."""
+    x0 = NOTE_X[k]
+    n = board.crop((x0, 49, x0 + 80, 207)); nw, nh = n.size
+    T = Image.new('RGBA', (W, H))
+    paper = n.crop((C, C + 6, C + 40, C + 66))
+    for y in range(C, H - C, paper.height):
+        for x in range(C, W - C, paper.width):
+            T.paste(paper.crop((0, 0, min(paper.width, W - C - x), min(paper.height, H - C - y))), (x, y))
+    top, bot = n.crop((C + 6, 0, C + 16, C)), n.crop((C + 6, nh - C, C + 16, nh))
+    for x in range(C, W - C, 10):
+        cw = min(10, W - C - x)
+        T.paste(top.crop((0, 0, cw, C)), (x, 0)); T.paste(bot.crop((0, 0, cw, C)), (x, H - C))
+    lef, rig = n.crop((0, C + 6, C, C + 26)), n.crop((nw - C, C + 6, nw, C + 26))
+    for y in range(C, H - C, 20):
+        ch = min(20, H - C - y)
+        T.paste(lef.crop((0, 0, C, ch)), (0, y)); T.paste(rig.crop((0, 0, C, ch)), (W - C, y))
+    T.paste(n.crop((0, 0, C, C)), (0, 0)); T.paste(n.crop((nw - C, 0, nw, C)), (W - C, 0))
+    T.paste(n.crop((0, nh - C, C, nh)), (0, H - C)); T.paste(n.crop((nw - C, nh - C, nw, nh)), (W - C, H - C))
+    if k == 2:                                                   # the green note's middle pin
+        T.paste(n.crop((36, 0, 48, C)), (W // 2 - 6, 0))
+    return T
+
+NOTE_POS, NOTE_W, NOTE_H = (6, 5), 236, 189
+ROW_Y0, ROW_H, GRP_X, GRP_W = 46, 22, 134, 22
+def row_y(w): return ROW_Y0 + w * ROW_H
+def note_template(k, filled):
+    T = build_note(k, NOTE_W, NOTE_H)
+    T.alpha_composite(FILE_T[k], (14, 12))
+    if filled:
+        T.alpha_composite(SH_BIG_ON, (112, 9))
+        T.alpha_composite(tint(PCT, (96, 58, 14)), (NOTE_W - 30, 16))
+        for w in range(6):
+            y = row_y(w)
+            T.alpha_composite(SH_SMALL_DIM, (8, y + 5))              # boss crystal
+            wn = world_name[w].crop(world_name[w].getbbox())
+            T.alpha_composite(wn, (19, y + 1))
+            for s in range(STAGES[w]):
+                for j in range(3):
+                    T.alpha_composite(SH_SMALL_DIM, (GRP_X + s * GRP_W + j * 6, y + 5))
+    return T
+
+# Stage select background: the HUD's wood stripes, the world strip and a white box for crystals
+def stage_select_bg(boss):
+    T = Image.new('RGBA', (IW, IH))
+    st = frame.crop((12, 2, 13, 24)).resize((IW, 22), Image.NEAREST)
+    for y in range(0, IH, 22): T.paste(st, (0, y))
+    d = ImageDraw.Draw(T)
+    ox, oy = -IX, -IY
+    rounded(d, ox + X0, oy + 20, 206, 26, DARK)
+    T.alpha_composite(level_word, (ox + X0 + 132, oy + 26))
+    rounded(d, ox + X0, oy + 56, 206, 48, DARK)                      # plate / boss name strip
+    rounded(d, ox + 50, oy + 116, 148, 52, EDGE)
+    rounded(d, ox + 51, oy + 117, 146, 50, (255, 255, 255, 255))
+    for x in ([SS_SH_X[1]] if boss else SS_SH_X):
+        T.alpha_composite(SH_BIG_DIM, (ox + x, oy + 127))
+    return T
+SS_SH_X = [70, 110, 150]
+
+files_extra = {
+    "icons/shard_small.png": SH_SMALL, "icons/shard_big.png": SH_BIG_ON,
+    "images/ss_bg.png": stage_select_bg(False), "images/ss_bg_boss.png": stage_select_bg(True),
+}
+for k in range(3):
+    files_extra["images/note_%d.png" % k] = note_template(k, True)
+    files_extra["images/note_%d_empty.png" % k] = note_template(k, False)
+for d_, im in WDIG.items(): files_extra["wdigits/%d.png" % d_] = im
+for k, im in STAGE_PLATE.items(): files_extra["images/stage_plate_%d.png" % k] = im
+for w, im in BOSS_NAME.items(): files_extra["images/boss_%d.png" % w] = im
+
+# --- values ---
+EMPTY = str(0x99999999)
+def gate(name, src, on="is_files"):
+    values[name] = {"type": "select", "index": on, "options": ["zero", src]}
+values.update({
+    "cursor": {"type": "u32", "addr": "0x800D6B88"},
+    "f_world": {"type": "u32", "chain": ["0x800ECA08", {"value": "cursor", "times": 0x58}]},
+    "f_empty": {"type": "lookup", "value": "f_world", "default": 0, "table": {EMPTY: 1}},
+    "f_full": {"type": "lookup", "value": "f_world", "default": 1, "table": {EMPTY: 0}},
+    "f_pct": {"type": "u8", "chain": ["0x800ECA08", {"value": "cursor", "times": 0x58}, "0x10"]},
+    "is_ssel": {"type": "lookup", "value": "scene", "default": 0, "table": {"12": 1}},
+    "ss_world": {"type": "u32", "addr": "0x800D6B98"},
+    "ss_stage": {"type": "u32", "addr": "0x800D6B9C"},
+    "ss_world_no": {"type": "u32", "addr": "0x800D6B98", "add": 1},
+    "ss_ws": {"type": "sum", "terms": [{"value": "ss_world", "times": 10}, "ss_stage"]},
+    "ss_boss": {"type": "lookup", "value": "ss_ws", "default": 0,
+                "table": {str(w * 10 + s): 1 for w, s in BOSS_STAGE.items()}},
+    "ss_notboss": {"type": "lookup", "value": "ss_ws", "default": 1,
+                   "table": {str(w * 10 + s): 0 for w, s in BOSS_STAGE.items()}},
+    "ss_bossflag": {"type": "flags", "mode": "any", "bits": [0], "chain": ["0x800D6BC0", {"value": "ss_world", "times": 1}]},
+})
+gate("fs_full", "f_full"); gate("fs_empty", "f_empty")
+for w in range(6):
+    values["f_b%d" % w] = {"type": "flags", "mode": "any", "bits": [0],
+                           "chain": ["0x800ECA08", {"value": "cursor", "times": 0x58}, hex(0x34 + w)]}
+    gate("fs_b%d" % w, "f_b%d" % w)
+    for s in range(STAGES[w]):
+        for j in range(3):
+            values["f_%d_%d_%d" % (w, s, j)] = {"type": "flags", "mode": "any", "bits": [j],
+                "chain": ["0x800ECA08", {"value": "cursor", "times": 0x58}, hex(0x3C + w * 4 + s)]}
+            gate("fs_%d_%d_%d" % (w, s, j), "f_%d_%d_%d" % (w, s, j))
+gate("ssg_normal", "ss_notboss", "is_ssel"); gate("ssg_boss", "ss_boss", "is_ssel")
+values["ss_boss_got"] = {"type": "select", "index": "ss_boss", "options": ["zero", "ss_bossflag"]}
+gate("ssg_boss_got", "ss_boss_got", "is_ssel")
+for j in range(3):
+    values["ss_sh%d" % j] = {"type": "flags", "mode": "any", "bits": [j],
+                             "chain": ["0x800D6BC8", {"value": "ss_world", "times": 4}, {"value": "ss_stage", "times": 1}]}
+    values["ss_shn%d" % j] = {"type": "select", "index": "ss_notboss", "options": ["zero", "ss_sh%d" % j]}
+    gate("ssg_sh%d" % j, "ss_shn%d" % j, "is_ssel")
+
+# --- layers (inserted right after the cork board, before the fades) ---
+ML = []
+nx, ny = NOTE_POS
+ML.append({"pick": "cursor", "show": "fs_full", "x": nx, "y": ny, "images": {str(k): "images/note_%d.png" % k for k in range(3)}})
+ML.append({"pick": "cursor", "show": "fs_empty", "x": nx, "y": ny, "images": {str(k): "images/note_%d_empty.png" % k for k in range(3)}})
+ML.append({"number": "f_pct", "show": "fs_full", "glyphs": "wdigits/{c}.png", "advance": 16, "align": "right",
+           "x": nx + NOTE_W - 32, "y": ny + 11})
+for w in range(6):
+    y = ny + row_y(w)
+    ML.append({"image": "icons/shard_small.png", "x": nx + 8, "y": y + 5, "show": "fs_b%d" % w, "hide": "f_empty"})
+    for s in range(STAGES[w]):
+        for j in range(3):
+            ML.append({"image": "icons/shard_small.png", "x": nx + GRP_X + s * GRP_W + j * 6, "y": y + 5,
+                       "show": "fs_%d_%d_%d" % (w, s, j), "hide": "f_empty"})
+# stage select
+ML.append({"image": "images/ss_bg.png", "x": IX, "y": IY, "show": "ssg_normal"})
+ML.append({"image": "images/ss_bg_boss.png", "x": IX, "y": IY, "show": "ssg_boss"})
+ML.append({"pick": "ss_world", "show": "is_ssel", "x": X0 + 8, "y": 23, "images": {str(w): "images/world_%d.png" % w for w in range(7)}})
+ML.append({"pick": "ss_world_no", "show": "is_ssel", "x": X0 + 178, "y": 26, "images": {str(n): "images/level_%d.png" % n for n in range(1, 8)}})
+ML.append({"pick": "ss_stage", "show": "ssg_normal", "anchor": "center", "x": 124, "y": 80,
+           "images": {str(k): "images/stage_plate_%d.png" % k for k in range(4)}})
+ML.append({"pick": "ss_world", "show": "ssg_boss", "anchor": "center", "x": 124, "y": 80,
+           "images": {str(w): "images/boss_%d.png" % w for w in range(7)}})
+for j in range(3):
+    ML.append({"image": "icons/shard_big.png", "x": SS_SH_X[j], "y": 127, "show": "ssg_sh%d" % j})
+ML.append({"image": "icons/shard_big.png", "x": SS_SH_X[1], "y": 127, "show": "ssg_boss_got"})
+
+idx = next(i for i, l in enumerate(L) if l.get("image") == "images/intro_files.png")
+L[idx + 1:idx + 1] = ML
 
 md5 = hashlib.md5(rom).hexdigest()
 manifest = {
@@ -202,6 +479,10 @@ manifest = {
 }
 
 files = {
+    **files_extra,
+    "images/intro_files.png": intro_files,
+    **fade_img,
+    "images/intro_white.png": intro_white, "images/intro_title.png": intro_title,
     "images/bg.png": bg, "images/cell.png": cell, "images/star.png": star, "images/ring.png": ring,
     "images/stage4.png": stage_box(4), "icons/shard.png": SHARD_ON,
 }
@@ -222,7 +503,7 @@ print('wrote', OUT, '(%d files)' % (len(files) + 1))
 # Optional preview: draws the pixel_screen the way the emulator does, with sample values
 # ---------------------------------------------------------------------------------------------
 if PREVIEW:
-    sample = {"lives": 3, "hp": 4, "stars": 17, "ability": 14, "world": 1, "stage": 1, "world_no": 2,
+    sample = {"lives": 2, "hp": 4, "stars": 17, "ability": 14, "world": 1, "stage": 1, "world_no": 2,
               "shards": 23, "is_dark": 0, "has4": 1}
     sample["ability_l"], sample["ability_r"] = AB_L[sample["ability"]], AB_R[sample["ability"]]
     shard_bits = {0: 7, 1: 5, 2: 0, 3: 0}
