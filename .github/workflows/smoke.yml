@@ -8,6 +8,10 @@ on:
       tag:
         description: Release tag to test (empty = latest)
         required: false
+      mode:
+        description: "menus or game"
+        required: false
+        default: menus
 
 permissions:
   contents: write
@@ -33,6 +37,10 @@ jobs:
         if [ -z "$TAG" ]; then gh release download --repo "$GITHUB_REPOSITORY" --pattern '*.apk' --dir apk
         else gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.apk' --dir apk; fi
         ls -la apk
+        # Public-domain sound test ROM (PeterLemon/N64, unlicense) for the game test
+        mkdir -p rom
+        curl -sSL -o rom/test.n64 "https://raw.githubusercontent.com/PeterLemon/N64/master/Sound/PCM/LongShot/STEREO/16BIT/LongShotSTEREO16BIT.N64"
+        ls -la rom
 
     - name: Run on emulator
       uses: reactivecircus/android-emulator-runner@v2
@@ -42,7 +50,7 @@ jobs:
         target: google_apis
         disable-animations: true
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-        script: bash .github/smoke/run.sh
+        script: bash .github/smoke/${{ github.event.inputs.mode == 'game' && 'game' || 'run' }}.sh
 
     - name: Push results to the smoke-results branch
       if: always()
