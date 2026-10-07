@@ -178,7 +178,6 @@
         <item name="buttonBarPositiveButtonStyle">@style/N64.DialogButton.Positive</item>
         <item name="buttonBarNegativeButtonStyle">@style/N64.DialogButton</item>
         <item name="buttonBarNeutralButtonStyle">@style/N64.DialogButton</item>
-        <item name="windowTitleStyle">@style/N64.DialogTitle</item>
         <item name="android:windowTitleStyle">@style/N64.DialogTitle</item>
     </style>
 
