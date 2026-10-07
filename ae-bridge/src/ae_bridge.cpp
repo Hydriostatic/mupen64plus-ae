@@ -110,6 +110,27 @@ static uint32_t ra_read_memory(uint32_t address, uint8_t* buffer, uint32_t num_b
     return i;
 }
 
+// ---------- Live memory reads (second-screen game info, e.g. Banjo-Tooie stats) ----------
+// Copies `length` bytes of N64 RDRAM starting at `address` (0x00000000-0x007FFFFF, or a
+// 0x80000000 KSEG0 address) into `out` in N64 (big-endian) byte order. The core keeps RDRAM
+// as native-endian 32-bit words, so on little-endian hosts byte N lives at index N ^ 3.
+// Returns the number of bytes copied (0 if no game is running).
+extern "C" DECLSPEC uint32_t aeReadRdram(uint32_t address, uint8_t* out, uint32_t length) {
+    if (!DebugMemGetPointer || !out) return 0;
+    const uint8_t* rdram = (const uint8_t*)DebugMemGetPointer(M64P_DBG_PTR_RDRAM);
+    if (!rdram) return 0;
+    address &= 0x1FFFFFFF;  // strip KSEG0/KSEG1 bits
+    uint32_t i;
+    for (i = 0; i < length && (address + i) < 0x800000; i++) {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        out[i] = rdram[address + i];
+#else
+        out[i] = rdram[(address + i) ^ 3];
+#endif
+    }
+    return i;
+}
+
 static void ra_server_call(const rc_api_request_t* request,
                            rc_client_server_callback_t callback,
                            void* callback_data, rc_client_t*) {

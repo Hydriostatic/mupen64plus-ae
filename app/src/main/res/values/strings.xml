@@ -1036,4 +1036,27 @@
     <string name="actionSearchRoms">Search ROMs</string>
 
 
+
+    <!-- Second-screen expansions (.exp) and updates -->
+    <string name="menuItem_expansions">Expansions (.exp)</string>
+    <string name="menuItem_checkUpdates">Check for updates</string>
+    <string name="expansions_title">Expansions</string>
+    <string name="expansions_import">Import .exp</string>
+    <string name="expansions_none">No expansions installed. An expansion (.exp) gives a game a panel on the second screen.</string>
+    <string name="expansions_remove">Remove</string>
+    <string name="expansions_for">For: %1$s · v%2$s</string>
+    <string name="expansions_imported">Expansion installed: %1$s</string>
+    <string name="expansions_importFailed">Not a valid expansion: %1$s</string>
+    <string name="expansions_removed">Expansion removed: %1$s</string>
+    <string name="expansions_noPicker">No file picker found on this device.</string>
+    <string name="update_title">Update</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_available">Version %1$s is available (you have %2$s).</string>
+    <string name="update_install">Update</string>
+    <string name="update_later">Later</string>
+    <string name="update_downloading">Downloading… %1$d%%</string>
+    <string name="update_upToDate">You have the latest version (%1$s).</string>
+    <string name="update_failed">Couldn\'t check for updates: %1$s</string>
+    <string name="update_allowInstall">Allow installing apps from this app, then come back.</string>
+
 </resources>

@@ -360,6 +360,9 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
 
         // Lay out the content
         setContentView( R.layout.gallery_activity );
+
+        // Look for a newer build on GitHub (once per start) and offer it
+        Updater.autoCheck(this);
         mGridView = findViewById( R.id.gridview );
 
         FloatingActionButton floatingActionButton = findViewById(R.id.menuItem_refreshRoms);
@@ -605,6 +608,9 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
 
         super.onResume();
 
+        // Back from allowing installs from this app: continue a downloaded update
+        Updater.onResume(this);
+
         //mRefreshNeeded will be set to true whenever a game is launched
         if(mRefreshNeeded)
         {
@@ -785,6 +791,12 @@ public class GalleryActivity extends AppCompatActivity implements GameSidebarAct
         if (item.getItemId() == R.id.menuItem_refreshRoms) {
             Intent intent = new Intent(this, ScanRomsActivity.class);
             mLaunchScanRoms.launch(intent);
+            return true;
+        } else if (item.getItemId() == R.id.menuItem_expansions) {
+            paulscode.android.mupen64plusae.game.ExpansionsDialog.show(this);
+            return true;
+        } else if (item.getItemId() == R.id.menuItem_checkUpdates) {
+            Updater.checkNow(this);
             return true;
         } else if (item.getItemId() == R.id.menuItem_categoryLibrary) {
             tagForRefreshNeeded();

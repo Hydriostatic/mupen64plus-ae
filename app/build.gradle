@@ -22,10 +22,26 @@ android {
 
     defaultConfig {
         applicationId = "org.mupen64plusae.v3.alpha"
+        // M64 EXP version: goes up with every GitHub build, so Android installs it as an update
+        // and the in-app updater can tell which build is newer
+        def build = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInteger()
+        versionCode = 20000 + build
+        versionName = "M64 EXP 1.0." + build
+    }
+    // One fixed key, so every new build installs as an update over the previous one
+    signingConfigs {
+        m64exp {
+            storeFile = rootProject.file("signing/m64ds.keystore")
+            storePassword = "m64ds-thor"
+            keyAlias = "m64ds"
+            keyPassword = "m64ds-thor"
+        }
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.m64exp
+            // Own package: installs next to the official app and earlier M64-DS builds
+            applicationIdSuffix ".exp"
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             ndk {

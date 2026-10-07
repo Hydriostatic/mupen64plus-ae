@@ -7,6 +7,14 @@
         android:icon="@drawable/ic_controller"
         android:title="@string/menuItem_refreshRoms"/>
     <item
+        android:id="@+id/menuItem_expansions"
+        android:icon="@drawable/ic_plus"
+        android:title="@string/menuItem_expansions"/>
+    <item
+        android:id="@+id/menuItem_checkUpdates"
+        android:icon="@drawable/ic_refresh"
+        android:title="@string/menuItem_checkUpdates"/>
+    <item
         android:id="@+id/menuItem_settings"
         android:icon="@drawable/ic_settings"
         android:title="@string/menuItem_settings">

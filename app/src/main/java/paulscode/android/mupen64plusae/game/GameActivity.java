@@ -187,6 +187,10 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
     private GameSidebar mGameSidebar;
     private GameSurface mGameSurface;
 
+    // Second screen (e.g. AYN Thor bottom screen): the panel of an imported .exp for this ROM
+    private Expansion mExpansion;
+    private SecondScreenPanel mSecondScreenPanel;
+
     // Input resources
     private VisibleTouchMap mTouchscreenMap;
     private KeyProvider mKeyProvider;
@@ -452,6 +456,9 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
 
         mDrawerLayout.setBackgroundColor(0xFF000000);
 
+        // An imported expansion (.exp) for this ROM gives the second screen its panel
+        mExpansion = ExpansionManager.findFor(this, mRomHeaderName, mRomCountryCode, mRomCrc, mRomMd5);
+
         if (!TextUtils.isEmpty(mRomArtPath) && new File(mRomArtPath).exists() && FileUtil.isFileImage(new File(mRomArtPath)))
             mGameSidebar.setImage(new BitmapDrawable(this.getResources(), mRomArtPath));
 
@@ -665,6 +672,43 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         }
 
         mGameSurface.startGlContext();
+
+        showSecondScreenPanel();
+    }
+
+    /** Show the expansion's panel on the second screen (if there is one, and an expansion). */
+    private void showSecondScreenPanel()
+    {
+        if (mExpansion == null || mSecondScreenPanel != null) return;
+        mSecondScreenPanel = SecondScreenPanel.show(this, mExpansion,
+                () -> {
+                    // "Options" on the panel: the emulator's in-game menu on the main screen
+                    if (mDrawerLayout != null && !mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
+                        mDrawerLayout.openDrawer(GravityCompat.START);
+                    }
+                },
+                this::saveAndQuitFromSecondScreen);
+    }
+
+    private void hideSecondScreenPanel()
+    {
+        if (mSecondScreenPanel != null) {
+            try {
+                mSecondScreenPanel.dismiss();
+            } catch (Exception e) {
+                Log.w(TAG, "Couldn't close the second-screen panel", e);
+            }
+            mSecondScreenPanel = null;
+        }
+    }
+
+    /** "Save and quit" on the expansion's panel: save to the current slot, then leave the game. */
+    private void saveAndQuitFromSecondScreen()
+    {
+        if (mCoreFragment == null) return;
+        mCoreFragment.saveSlot();
+        // Give the save a moment to be written before shutting the emulator down
+        new Handler(Looper.getMainLooper()).postDelayed(() -> onExitRequested(true), 1500);
     }
 
     @Override
@@ -746,6 +790,8 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         }
 
         mGameSurface.stopGlContext();
+
+        hideSecondScreenPanel();
     }
 
     //This is only called once when fragment is destroyed due to rataining the state
@@ -764,6 +810,12 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
 
         if (mOverlay != null) {
             mOverlay.onDestroy();
+        }
+
+        hideSecondScreenPanel();
+        if (mExpansion != null) {
+            mExpansion.close();
+            mExpansion = null;
         }
     }
 
