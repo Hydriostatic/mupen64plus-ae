@@ -138,6 +138,12 @@ Uma segunda página, desenhada sobre uma imagem de template que mantém a propor
 - `map`: o mapa aparece com `zoom` e acompanha o jogador. A seta fica sempre no meio e o mapa
   desliza por baixo dela. A imagem do mapa é escolhida pelo valor `map_value`, comparado com
   `ids`. Sem `yaw`, o pin é redondo.
+- **Posição automática:** sem `ref`, o emulador descobre sozinho onde o jogo cai no mapa. Ele
+  junta os lugares por onde o jogador anda e, se houver `objects`, as posições dos objetos da
+  fase. Depois encaixa esses pontos na parte opaca da imagem do mapa, testando as 8 rotações e
+  espelhamentos. A estimativa melhora conforme se joga e fica salva no aparelho. Exemplo de
+  `objects` (a lista de objetos do Banjo-Tooie):
+  `{"list": "0x80136EE0", "first": 4, "last": 8, "base": 16, "stride": 156, "x": 4, "z": 12}`.
 - `ref`: pontos de calibração (posição no jogo para pixel do mapa); três pontos aceitam rotação.
   Dá para calibrar no aparelho, sem escrever `ref`: **segure o mapa** e toque onde o personagem
   está, em 3 lugares diferentes. A calibração fica salva no aparelho.

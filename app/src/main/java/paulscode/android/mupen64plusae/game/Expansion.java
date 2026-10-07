@@ -165,6 +165,9 @@ public final class Expansion
         final String mapValue, xValue, zValue, yawValue;
         final float yawOffset;
         final boolean yawClockwise;
+        /** Optional: the game's object list, whose positions help place the map by itself. */
+        final String objList;
+        final int objFirst, objLast, objBase, objStride, objX, objZ, objMax;
         final List<MapImage> maps = new ArrayList<>();
         final List<Slot> slots = new ArrayList<>();
         final List<Tab> tabs = new ArrayList<>();
@@ -186,6 +189,15 @@ public final class Expansion
             yawValue = map.optString("yaw", "");
             yawOffset = (float) map.optDouble("yaw_offset", 0);
             yawClockwise = map.optBoolean("yaw_clockwise", false);
+            JSONObject ob = map.optJSONObject("objects");
+            objList = ob != null ? ob.optString("list", null) : null;
+            objFirst = ob != null ? ob.optInt("first", 4) : 0;
+            objLast = ob != null ? ob.optInt("last", 8) : 0;
+            objBase = ob != null ? ob.optInt("base", 16) : 0;
+            objStride = ob != null ? ob.optInt("stride", 0) : 0;
+            objX = ob != null ? ob.optInt("x", 4) : 0;
+            objZ = ob != null ? ob.optInt("z", 12) : 0;
+            objMax = ob != null ? ob.optInt("max", 400) : 0;
             JSONArray imgs = map.optJSONArray("images");
             for (int i = 0; imgs != null && i < imgs.length(); i++) maps.add(new MapImage(imgs.getJSONObject(i)));
             JSONArray sl = o.optJSONArray("slots");
@@ -473,6 +485,38 @@ public final class Expansion
             return v;
         }
 
+        /**
+         * Positions (x, z pairs) of the objects in the game's object list, as the map page's
+         * "objects" describes it. Returns how many were read.
+         */
+        int readObjects(MapScreen ms, float[] out)
+        {
+            if (ms.objList == null || ms.objStride <= 0) return 0;
+            int list = readPtr(parse(ms.objList) & 0x7FFFFF);
+            if (list < 0) return 0;
+            int first = readPtr(list + ms.objFirst), last = readPtr(list + ms.objLast);
+            if (first < 0 || last < first) return 0;
+            int count = Math.min(Math.min(ms.objMax, out.length / 2), (last - first) / ms.objStride + 1);
+            int n = 0;
+            byte[] slot = new byte[Math.max(ms.objX, ms.objZ) + 4];
+            for (int i = 0; i < count; i++) {
+                int a = list + ms.objBase + i * ms.objStride;
+                if (!GameMemory.read(a, slot, slot.length)) break;
+                float x = Float.intBitsToFloat(be32(slot, ms.objX)), z = Float.intBitsToFloat(be32(slot, ms.objZ));
+                if (Float.isNaN(x) || Float.isNaN(z)) continue;
+                out[n * 2] = x; out[n * 2 + 1] = z; n++;
+            }
+            return n;
+        }
+
+        /** Physical address of the pointer stored at {@code addr}, or -1. */
+        private int readPtr(int addr)
+        {
+            if (!GameMemory.read(addr, mBuf, 4)) return -1;
+            int p = be32(mBuf, 0);
+            return (p & 0xFF800000) == 0x80000000 ? p & 0x7FFFFF : -1;
+        }
+
         /** A value as a number, or null if it isn't one (or can't be read right now). */
         Long number(String key)
         {
@@ -632,6 +676,11 @@ public final class Expansion
             if ("s16".equals(type)) v = (short) v;
             return v;
         }
+    }
+
+    static int be32(byte[] b, int i)
+    {
+        return ((b[i] & 0xFF) << 24) | ((b[i + 1] & 0xFF) << 16) | ((b[i + 2] & 0xFF) << 8) | (b[i + 3] & 0xFF);
     }
 
     static int parse(String s)

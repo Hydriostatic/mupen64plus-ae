@@ -305,6 +305,7 @@ public class ExpansionView extends View
 
         // Player position on the map picture (map pixels), if known
         Long gx = mReader.number(ms.xValue), gz = mReader.number(ms.zValue);
+        feedAuto(ms, mi, map, gx, gz);
         double[] aff = calibration(mi);
         boolean havePos = !mCalibrating && aff != null && gx != null && gz != null;
         float px = havePos ? (float) (aff[0] * gx + aff[1] * gz + aff[2]) : mi.centerX * map.getWidth();
@@ -361,7 +362,7 @@ public class ExpansionView extends View
         }
         if (!havePos) {
             banner(c, gx == null || gz == null ? "Posição do jogador: não encontrada"
-                    : "Segure o mapa para calibrar", area);
+                    : "Ajustando o mapa sozinho… ande um pouco", area);
             return;
         }
 
@@ -424,10 +425,59 @@ public class ExpansionView extends View
 
     private String calKey(Expansion.MapImage mi) { return mExp.id + "|" + mi.image; }
 
-    /** The user's own calibration for this map if there is one, else the expansion's. */
+    // --- Automatic placement (no help from the user) ---------------------------------------
+    private final java.util.Map<Expansion.MapImage, MapAutoCalibrator> mAuto = new java.util.HashMap<>();
+    private final float[] mObjBuf = new float[800];
+    private long mLastObjRead, mLastAutoSave;
+
+    private String autoKey(Expansion.MapImage mi) { return "auto|" + mExp.id + "|" + mi.image; }
+
+    private MapAutoCalibrator auto(Expansion.MapImage mi, Bitmap map)
+    {
+        MapAutoCalibrator a = mAuto.get(mi);
+        if (a == null) {
+            a = new MapAutoCalibrator(map);
+            a.load(prefs().getString(autoKey(mi), null)); // keeps improving across sessions
+            mAuto.put(mi, a);
+        }
+        return a;
+    }
+
+    /** Feed the spots we know are on solid ground: the player, and every few seconds the objects. */
+    private void feedAuto(Expansion.MapScreen ms, Expansion.MapImage mi, Bitmap map, Long gx, Long gz)
+    {
+        MapAutoCalibrator a = auto(mi, map);
+        boolean changed = gx != null && gz != null && a.add(gx, gz);
+        long now = SystemClock.elapsedRealtime();
+        if (now - mLastObjRead > 2000) {
+            mLastObjRead = now;
+            int n = mReader.readObjects(ms, mObjBuf);
+            for (int i = 0; i < n; i++) changed |= a.add(mObjBuf[i * 2], mObjBuf[i * 2 + 1]);
+        }
+        if (changed && now - mLastAutoSave > 10000) {
+            mLastAutoSave = now;
+            prefs().edit().putString(autoKey(mi), a.save()).apply();
+        }
+    }
+
+    private void saveAuto()
+    {
+        if (mAuto.isEmpty()) return;
+        android.content.SharedPreferences.Editor e = prefs().edit();
+        for (java.util.Map.Entry<Expansion.MapImage, MapAutoCalibrator> en : mAuto.entrySet()) {
+            e.putString(autoKey(en.getKey()), en.getValue().save());
+        }
+        e.apply();
+    }
+
+    /** Where game coordinates land: the user's own calibration, else the expansion's, else a guess. */
     private double[] calibration(Expansion.MapImage mi)
     {
-        if (mCalCache.containsKey(mi)) return mCalCache.get(mi);
+        if (mCalCache.containsKey(mi) && mCalCache.get(mi) != null) return mCalCache.get(mi);
+        if (mCalCache.containsKey(mi)) {
+            MapAutoCalibrator a = mAuto.get(mi);
+            return a != null ? a.affine() : null;
+        }
         double[] aff = mi.affine;
         String saved = prefs().getString(calKey(mi), null);
         if (saved != null) {
@@ -439,7 +489,9 @@ public class ExpansionView extends View
             } catch (Exception ignored) {}
         }
         mCalCache.put(mi, aff);
-        return aff;
+        if (aff != null) return aff;
+        MapAutoCalibrator a = mAuto.get(mi);
+        return a != null ? a.affine() : null;
     }
 
     private void startCalibration()
@@ -716,6 +768,7 @@ public class ExpansionView extends View
         mRunning = false;
         mHandler.removeCallbacks(mRefresh);
         mHandler.removeCallbacks(mLongPress);
+        saveAuto();
         super.onDetachedFromWindow();
     }
 }

@@ -105,6 +105,7 @@ manifest = {
             "zoom": 2.0,
             "map_value": "map",
             "x": "pos_x", "z": "pos_z",
+            "objects": {"list": "0x80136EE0", "first": 4, "last": 8, "base": 16, "stride": 156, "x": 4, "z": 12},
             "images": [
                 {"image": "maps/mayahem_temple.png", "ids": ["0xB8"], "center": [0.5, 0.45]}
             ]
