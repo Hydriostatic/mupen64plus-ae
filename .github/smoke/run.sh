@@ -16,6 +16,7 @@ shots() {  # $1 = step name
   adb exec-out screencap -p > "$OUT/${name}.png" 2>/dev/null
   adb shell dumpsys activity activities | grep -E "topResumedActivity|ResumedActivity|mFocusedApp" > "$OUT/${name}_activities.txt"
   adb logcat -d > "$OUT/${name}_logcat.txt"
+  adb logcat -d -b events | grep -E "am_(create|finish|destroy|resume|on_resume|pause|stop|focus|set_resumed)" | grep -i mupen > "$OUT/${name}_events.txt"
 }
 
 adb root; sleep 3
@@ -23,11 +24,14 @@ adb wait-for-device
 adb install -r -g apk/*.apk > "$OUT/install.txt" 2>&1
 cat "$OUT/install.txt"
 
+# Main screen like the Thor's top screen (landscape 1920x1080), second screen 1080x1240
+adb shell wm size 1080x1920
+adb shell wm density 420
 # Second screen 1080x1240 (the Thor's bottom screen)
 adb shell settings put global overlay_display_devices 1080x1240/320
 sleep 6
 adb shell dumpsys display | grep -E "mDisplayId=|DisplayDeviceInfo|mBaseDisplayInfo" > "$OUT/displays.txt"
-SECOND=$(adb shell dumpsys display | sed -n 's/.*mDisplayId=\([0-9]*\).*/\1/p' | sort -u | grep -v '^0$' | head -1)
+SECOND=$(adb shell dumpsys display | grep -o 'mDisplayId= *[0-9]*' | grep -o '[0-9]*$' | sort -u | grep -v '^0$' | head -1)
 echo "second display: $SECOND" | tee -a "$OUT/displays.txt"
 
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
@@ -42,22 +46,23 @@ shots app_start
 # 2) Bottom screen: tap the first button (Settings), then the first row of its popup
 tapb() { adb shell input -d "$SECOND" tap "$1" "$2"; sleep "${3:-4}"; }
 if [ -n "$SECOND" ]; then
-  tapb 190 300; shots bc_settings_button
-  tapb 540 560 8; shots bc_settings_first_row
-  tapb 540 420 5; shots bc_page_first_option
-  tapb 540 600 5; shots bc_page_second_option
-  adb shell input -d "$SECOND" keyevent KEYCODE_BACK; sleep 4; shots bc_back
-  tapb 540 300; shots bc_profiles_button
-  tapb 540 560 8; shots bc_profiles_first_row
+  tapb 191 272 5; shots bc_settings_button
+  for y in 260 380 500; do tapb 540 $y 8; shots "bc_popup_tap_$y"; adb shell input -d "$SECOND" keyevent KEYCODE_BACK; sleep 3; tapb 191 272 4; done
+  adb shell input -d "$SECOND" keyevent KEYCODE_BACK; sleep 3
+  tapb 540 272 5; shots bc_profiles_button
+  tapb 540 380 8; shots bc_profiles_row
+  adb shell input -d "$SECOND" keyevent KEYCODE_BACK; sleep 3
+  tapb 889 272 5; shots bc_tools_button
+  tapb 540 380 8; shots bc_tools_row
 fi
 
 # 3) Settings pages opened directly on the main screen, then tap options in them
 for A in DisplayPrefsActivity AudioPrefsActivity InputPrefsActivity LibraryPrefsActivity DataPrefsActivity; do
   adb shell am start -n $PKG/paulscode.android.mupen64plusae.persistent.$A
   sleep 6; shots "${A}_open"
-  adb shell input tap 540 420; sleep 4; shots "${A}_tap1"
+  adb shell input tap 540 1300; sleep 4; shots "${A}_tap1"
   adb shell input keyevent KEYCODE_BACK; sleep 2
-  adb shell input tap 540 700; sleep 4; shots "${A}_tap2"
+  adb shell input tap 540 1600; sleep 4; shots "${A}_tap2"
   adb shell input keyevent KEYCODE_BACK; sleep 2
   adb shell am force-stop $PKG; sleep 2
 done
