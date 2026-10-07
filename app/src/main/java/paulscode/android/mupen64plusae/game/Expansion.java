@@ -72,6 +72,140 @@ public final class Expansion
     final List<Tile> bar = new ArrayList<>();
     final String barLabel;
     private final Map<String, JSONObject> mValues = new HashMap<>();
+    /** Optional second page: a template picture with slots, tabs and a moving map. */
+    final MapScreen mapScreen;
+
+    /** A spot on the template: a circle with an icon and a value. Template pixels. */
+    static final class Slot
+    {
+        final float x, y, r;
+        final String icon, value;
+        Slot(JSONObject o)
+        {
+            x = (float) o.optDouble("x", 0); y = (float) o.optDouble("y", 0); r = (float) o.optDouble("r", 60);
+            icon = o.optString("icon", null); value = o.optString("value", "");
+        }
+    }
+
+    /** A tab plate on the template; action is "screen:main", "screen:map", "menu" or "save_quit". */
+    static final class Tab
+    {
+        final float x, y, w, h;
+        final String label, action;
+        Tab(JSONObject o)
+        {
+            x = (float) o.optDouble("x", 0); y = (float) o.optDouble("y", 0);
+            w = (float) o.optDouble("w", 100); h = (float) o.optDouble("h", 60);
+            label = o.optString("label", ""); action = o.optString("action", "");
+        }
+    }
+
+    /** One map picture and how game coordinates land on it. */
+    static final class MapImage
+    {
+        final String image;
+        final long[] ids;
+        /** Map pixel from game x/z: px = a0*x + a1*z + a2, py = a3*x + a4*z + a5 (or null). */
+        final double[] affine;
+        final float centerX, centerY;  // fractions: where to centre the view without a position
+        MapImage(JSONObject o) throws JSONException
+        {
+            image = o.getString("image");
+            JSONArray idList = o.optJSONArray("ids");
+            ids = new long[idList != null ? idList.length() : 0];
+            for (int i = 0; i < ids.length; i++) ids[i] = parse(idList.getString(i));
+            // "ref": 2 or 3 points [game x, game z, map px, map py]
+            JSONArray ref = o.optJSONArray("ref");
+            double[][] pts = new double[ref != null ? Math.min(3, ref.length()) : 0][];
+            for (int i = 0; i < pts.length; i++) {
+                JSONArray p = ref.getJSONArray(i);
+                pts[i] = new double[]{p.getDouble(0), p.getDouble(1), p.getDouble(2), p.getDouble(3)};
+            }
+            affine = affine(pts);
+            JSONArray c = o.optJSONArray("center");
+            centerX = c != null ? (float) c.optDouble(0, 0.5) : 0.5f;
+            centerY = c != null ? (float) c.optDouble(1, 0.5) : 0.5f;
+        }
+    }
+
+    /**
+     * Game x/z to map pixels from reference points {x, z, px, py}: three points give a full
+     * affine fit (any rotation/flip); two points scale each axis on its own. Null if unusable.
+     */
+    static double[] affine(double[][] p)
+    {
+        if (p.length >= 3) {
+            double x1 = p[0][0], z1 = p[0][1], x2 = p[1][0], z2 = p[1][1], x3 = p[2][0], z3 = p[2][1];
+            double det = x1 * (z2 - z3) - z1 * (x2 - x3) + (x2 * z3 - x3 * z2);
+            if (Math.abs(det) < 1e-6) return null;
+            double[] out = new double[6];
+            for (int k = 0; k < 2; k++) {
+                double v1 = p[0][2 + k], v2 = p[1][2 + k], v3 = p[2][2 + k];
+                double a = (v1 * (z2 - z3) - z1 * (v2 - v3) + (v2 * z3 - v3 * z2)) / det;
+                double b = (x1 * (v2 - v3) - v1 * (x2 - x3) + (x2 * v3 - x3 * v2)) / det;
+                double c = (x1 * (z2 * v3 - z3 * v2) - z1 * (x2 * v3 - x3 * v2) + v1 * (x2 * z3 - x3 * z2)) / det;
+                out[k * 3] = a; out[k * 3 + 1] = b; out[k * 3 + 2] = c;
+            }
+            return out;
+        }
+        if (p.length == 2) {
+            double dx = p[1][0] - p[0][0], dz = p[1][1] - p[0][1];
+            if (Math.abs(dx) < 1e-6 || Math.abs(dz) < 1e-6) return null;
+            double ax = (p[1][2] - p[0][2]) / dx, az = (p[1][3] - p[0][3]) / dz;
+            return new double[]{ax, 0, p[0][2] - ax * p[0][0], 0, az, p[0][3] - az * p[0][1]};
+        }
+        return null;
+    }
+
+    static final class MapScreen
+    {
+        final String template, mask;
+        final float[] mapRect = new float[4];   // l, t, r, b in template pixels
+        final float zoom;
+        final String mapValue, xValue, zValue, yawValue;
+        final float yawOffset;
+        final boolean yawClockwise;
+        final List<MapImage> maps = new ArrayList<>();
+        final List<Slot> slots = new ArrayList<>();
+        final List<Tab> tabs = new ArrayList<>();
+        final float titleX, titleY, titleW, titleSize;
+        final String titleValue;
+        final int fill;
+        MapScreen(JSONObject o, int defaultFill) throws JSONException
+        {
+            template = o.getString("template");
+            mask = o.optString("mask", null);
+            fill = color(o.optString("fill"), defaultFill);
+            JSONObject map = o.getJSONObject("map");
+            JSONArray r = map.getJSONArray("rect");
+            for (int i = 0; i < 4; i++) mapRect[i] = (float) r.getDouble(i);
+            zoom = (float) map.optDouble("zoom", 2.0);
+            mapValue = map.optString("map_value", "");
+            xValue = map.optString("x", "");
+            zValue = map.optString("z", "");
+            yawValue = map.optString("yaw", "");
+            yawOffset = (float) map.optDouble("yaw_offset", 0);
+            yawClockwise = map.optBoolean("yaw_clockwise", false);
+            JSONArray imgs = map.optJSONArray("images");
+            for (int i = 0; imgs != null && i < imgs.length(); i++) maps.add(new MapImage(imgs.getJSONObject(i)));
+            JSONArray sl = o.optJSONArray("slots");
+            for (int i = 0; sl != null && i < sl.length(); i++) slots.add(new Slot(sl.getJSONObject(i)));
+            JSONArray tb = o.optJSONArray("tabs");
+            for (int i = 0; tb != null && i < tb.length(); i++) tabs.add(new Tab(tb.getJSONObject(i)));
+            JSONObject t = o.optJSONObject("title");
+            if (t == null) t = new JSONObject();
+            titleX = (float) t.optDouble("x", 200); titleY = (float) t.optDouble("y", 120);
+            titleW = (float) t.optDouble("w", 320); titleSize = (float) t.optDouble("size", 58);
+            titleValue = t.optString("value", "");
+        }
+
+        /** The picture for this map id, or null. */
+        MapImage imageFor(long mapId)
+        {
+            for (MapImage m : maps) for (long id : m.ids) if (id == mapId) return m;
+            return null;
+        }
+    }
 
     /** A tile (or a bar item): a label, an icon and a value template like "{jiggies}/90". */
     static final class Tile
@@ -132,13 +266,17 @@ public final class Expansion
         titleColors = new int[tc != null ? tc.length() : 0];
         for (int i = 0; i < titleColors.length; i++) titleColors[i] = color(tc.optString(i), 0xFFFFFFFF);
 
-        JSONObject screen = m.getJSONObject("screen");
+        JSONObject screen = m.optJSONObject("screen");
+        if (screen == null) screen = new JSONObject();
         title = screen.optString("title", name);
         columns = Math.max(1, Math.min(6, screen.optInt("columns", 4)));
         readTiles(screen.optJSONArray("tiles"), tiles);
         JSONObject b = screen.optJSONObject("bar");
         barLabel = b != null ? b.optString("label", "") : "";
         if (b != null) readTiles(b.optJSONArray("items"), bar);
+
+        JSONObject ms = m.optJSONObject("map_screen");
+        mapScreen = ms != null ? new MapScreen(ms, background) : null;
 
         JSONObject values = m.optJSONObject("values");
         if (values != null) {
@@ -335,6 +473,14 @@ public final class Expansion
             return v;
         }
 
+        /** A value as a number, or null if it isn't one (or can't be read right now). */
+        Long number(String key)
+        {
+            if (key == null || key.isEmpty()) return null;
+            Object v = value(key, 0);
+            return v instanceof Long ? (Long) v : null;
+        }
+
         private long num(String key, int depth)
         {
             Object v = value(key, depth + 1);
@@ -346,6 +492,19 @@ public final class Expansion
             String type = d.optString("type", "u8");
             try {
                 switch (type) {
+                    case "f32": {
+                        Integer addr = address(d);
+                        if (addr == null) return null;
+                        float f = Float.intBitsToFloat((int) read(addr, "u32"));
+                        if (Float.isNaN(f) || Float.isInfinite(f)) return null;
+                        return Math.round(f * d.optDouble("times", 1) + d.optDouble("add", 0)) * 1L;
+                    }
+                    case "select": {
+                        long i = num(d.getString("index"), depth);
+                        JSONArray opts = d.getJSONArray("options");
+                        if (i < 0 || i >= opts.length()) return d.has("default") ? d.opt("default") : null;
+                        return value(opts.getString((int) i), depth + 1);
+                    }
                     case "u8": case "s8": case "u16": case "s16": case "u32": {
                         Integer addr = address(d);
                         if (addr == null) return null;
@@ -387,15 +546,17 @@ public final class Expansion
                     case "lookup": {
                         long v = num(d.getString("value"), depth);
                         JSONObject table = d.getJSONObject("table");
-                        String hit = table.optString(String.valueOf(v), null);
-                        if (hit == null) hit = table.optString("0x" + Long.toHexString(v).toUpperCase(Locale.US), null);
-                        if (hit == null) hit = table.optString("0x" + Long.toHexString(v), null);
+                        Object hit = table.opt(String.valueOf(v));
+                        if (hit == null) hit = table.opt("0x" + Long.toHexString(v).toUpperCase(Locale.US));
+                        if (hit == null) hit = table.opt("0x" + Long.toHexString(v));
+                        if (hit instanceof Number) hit = ((Number) hit).longValue();
                         if (hit != null) {
                             if (d.optBoolean("keep_last", false)) mKept.put(key, hit);
                             return hit;
                         }
                         if (d.optBoolean("keep_last", false) && mKept.containsKey(key)) return mKept.get(key);
-                        return d.optString("default", "");
+                        Object def = d.opt("default");
+                        return def instanceof Number ? (Object) ((Number) def).longValue() : d.optString("default", "");
                     }
                     case "const":
                         return d.opt("value") instanceof Number ? ((Number) d.opt("value")).longValue() : d.optString("value");
@@ -418,6 +579,29 @@ public final class Expansion
         /** "addr", or "ptr" (address holding a pointer) + "offset". Physical RDRAM offset or null. */
         private Integer address(JSONObject d) throws JSONException
         {
+            if (d.has("chain")) {
+                // ["0x80135490", {"value": "idx", "times": 4}, "*", "0xE4", "*", "8"]:
+                // start address, then add numbers / values, "*" = follow the pointer stored there
+                JSONArray ch = d.getJSONArray("chain");
+                long cur = parse(ch.getString(0)) & 0x7FFFFF;
+                for (int i = 1; i < ch.length(); i++) {
+                    Object step = ch.get(i);
+                    if (step instanceof JSONObject) {
+                        JSONObject o = (JSONObject) step;
+                        Long v = number(o.getString("value"));
+                        if (v == null) return null;
+                        cur += v * o.optLong("times", 1);
+                    } else if ("*".equals(String.valueOf(step))) {
+                        if (!BanjoTooieStats.readRaw((int) cur, mBuf, 4)) return null;
+                        int ptr = ((mBuf[0] & 0xFF) << 24) | ((mBuf[1] & 0xFF) << 16) | ((mBuf[2] & 0xFF) << 8) | (mBuf[3] & 0xFF);
+                        if ((ptr & 0xFF800000) != 0x80000000) return null;
+                        cur = ptr & 0x7FFFFF;
+                    } else {
+                        cur += parse(String.valueOf(step));
+                    }
+                }
+                return (int) (cur & 0x7FFFFF);
+            }
             if (d.has("ptr")) {
                 int p = parse(d.getString("ptr"));
                 if (!BanjoTooieStats.readRaw(p, mBuf, 4)) return null;

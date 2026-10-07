@@ -107,5 +107,55 @@ Exemplo, com as notas do Banjo-Tooie (ninhos valem 5, claves valem 20):
 "notes": { "type": "sum", "terms": [ {"value": "nests", "times": 5}, {"value": "clefs", "times": 20} ] }
 ```
 
+## Página de mapa (`map_screen`, opcional)
+
+Uma segunda página, desenhada sobre uma imagem de template que mantém a proporção original
+(as sobras da tela ficam na cor `fill`). Todas as posições são em pixels do template.
+
+```json
+"map_screen": {
+  "template": "images/map_template.jpg",
+  "mask": "images/map_mask.png",
+  "fill": "#2A1709",
+  "title": { "x": 205, "y": 120, "w": 320, "size": 58, "value": "{world}" },
+  "map": {
+    "rect": [228, 58, 1158, 892],
+    "zoom": 2.0,
+    "map_value": "map",
+    "x": "pos_x", "z": "pos_z", "yaw": "",
+    "images": [ { "image": "maps/mayahem_temple.png", "ids": ["0xB8"], "center": [0.5, 0.45],
+                  "ref": [[x, z, px, py], [x, z, px, py], [x, z, px, py]] } ]
+  },
+  "slots": [ { "x": 110, "y": 270, "r": 72, "icon": "icons/jiggy.png", "value": "{here_jiggies}/10" } ],
+  "tabs":  [ { "x": 10, "y": 925, "w": 262, "h": 150, "label": "Painel", "action": "screen:main" } ]
+}
+```
+
+- `title`: o nome em duas linhas. A primeira palavra usa a cor 1 de `title_colors` e o resto
+  usa a cor 2. Segure o nome para salvar uma cópia da memória em Download/Mupen64BT.
+- `mask`: um PNG do tamanho do template. O mapa só aparece onde a máscara é opaca (por exemplo,
+  no formato do pergaminho).
+- `map`: o mapa aparece com `zoom` e acompanha o jogador. A seta fica sempre no meio e o mapa
+  desliza por baixo dela. A imagem do mapa é escolhida pelo valor `map_value`, comparado com
+  `ids`. Sem `yaw`, o pin é redondo.
+- `ref`: pontos de calibração (posição no jogo para pixel do mapa); três pontos aceitam rotação.
+  Dá para calibrar no aparelho, sem escrever `ref`: **segure o mapa** e toque onde o personagem
+  está, em 3 lugares diferentes. A calibração fica salva no aparelho.
+- `tabs` → `action`: `screen:main` (página de blocos), `screen:map`, `menu` (menu do emulador),
+  `save_quit`.
+
+### Mais tipos de valor
+
+| `type` | campos | resultado |
+|---|---|---|
+| `f32` | `addr`, `ptr` ou `chain` | número decimal do jogo (arredondado); aceita `times` e `add` |
+| `select` | `index`, `options` (nomes), `default` | o valor escolhido pelo índice |
+
+`lookup` também pode devolver números (por exemplo, mapa → índice do mundo).
+
+`chain` segue ponteiros: `["0x80135490", {"value": "player_index", "times": 4}, "*", "0xE4", "*", "8"]`.
+O primeiro item é o endereço inicial. Números somam ao endereço, `{"value": …}` soma um valor e
+`"*"` lê o ponteiro guardado ali.
+
 O exemplo completo está em `examples/expansions/banjotooie.exp`; para ver o manifest, abra o
 arquivo como zip.

@@ -52,6 +52,14 @@ public class ExpansionView extends View
     private final RectF mYesRect = new RectF(), mNoRect = new RectF();
 
     private boolean mRunning, mValid, mConfirmQuit;
+    /** Showing the map page (the expansion's map_screen) instead of the tiles page. */
+    private boolean mOnMap;
+    private final RectF mTitleRect = new RectF(), mMapBtnRect = new RectF();
+    private final RectF[] mTabRects;
+    private final float[] mTrailX = new float[4], mTrailY = new float[4];
+    private int mTrailCount = 0;
+    private Expansion.MapImage mTrailMap;
+    private final android.graphics.Path mPath = new android.graphics.Path();
     private long mLastTick;
 
     private final Runnable mRefresh = new Runnable() {
@@ -79,6 +87,10 @@ public class ExpansionView extends View
         Typeface tf = expansion.typeface(context.getCacheDir());
         if (tf == null) tf = Typeface.create("sans-serif-black", Typeface.BOLD);
         mText.setTypeface(tf);
+        mOnMap = expansion.mapScreen != null;
+        int tabs = expansion.mapScreen != null ? expansion.mapScreen.tabs.size() : 0;
+        mTabRects = new RectF[tabs];
+        for (int i = 0; i < tabs; i++) mTabRects[i] = new RectF();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -133,6 +145,10 @@ public class ExpansionView extends View
     {
         final float w = getWidth(), h = getHeight();
         if (w <= 0 || h <= 0) return;
+        if (mOnMap && mExp.mapScreen != null) {
+            drawMapScreen(c, w, h);
+            return;
+        }
         final float pad = w * 0.022f;
 
         // Background
@@ -170,15 +186,304 @@ public class ExpansionView extends View
             if (hasBar) drawBar(c, pad, barTop, w - pad, barBottom);
         }
 
-        // Buttons
+        mTitleRect.set(pad, signTop, w - pad, signBottom);
+
+        // Buttons (plus "Map" when the expansion has a map page)
         float gap = pad;
-        float bw = (inner - gap) / 2;
-        mMenuRect.set(pad, btnTop, pad + bw, btnTop + btnH);
-        mQuitRect.set(pad + bw + gap, btnTop, w - pad, btnTop + btnH);
+        boolean map = mExp.mapScreen != null;
+        float bw = (inner - gap * (map ? 2 : 1)) / (map ? 3 : 2);
+        float x0 = pad;
+        if (map) {
+            mMapBtnRect.set(x0, btnTop, x0 + bw, btnTop + btnH);
+            piece(c, mExp.buttonImage, mMapBtnRect.left, mMapBtnRect.top, mMapBtnRect.right, mMapBtnRect.bottom, mExp.panel);
+            text(c, "MAPA", mMapBtnRect.centerX(), mMapBtnRect.centerY(), btnH * 0.4f, mExp.text, bw * 0.8f, Paint.Align.CENTER);
+            x0 += bw + gap;
+        } else {
+            mMapBtnRect.setEmpty();
+        }
+        mMenuRect.set(x0, btnTop, x0 + bw, btnTop + btnH);
+        mQuitRect.set(x0 + bw + gap, btnTop, w - pad, btnTop + btnH);
         piece(c, mExp.buttonImage, mMenuRect.left, mMenuRect.top, mMenuRect.right, mMenuRect.bottom, mExp.panel);
         piece(c, mExp.buttonImage, mQuitRect.left, mQuitRect.top, mQuitRect.right, mQuitRect.bottom, mExp.panel);
         text(c, "OPÇÕES", mMenuRect.centerX(), mMenuRect.centerY(), btnH * 0.4f, mExp.text, bw * 0.8f, Paint.Align.CENTER);
         text(c, "SALVAR E SAIR", mQuitRect.centerX(), mQuitRect.centerY(), btnH * 0.4f, mExp.text, bw * 0.8f, Paint.Align.CENTER);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Map page: the template picture at its own proportions, slots, tabs and a map that follows
+    // the player (the player's arrow stays in the middle; the map slides under it)
+    // ---------------------------------------------------------------------------------------------
+
+    private float mTs, mTx, mTy; // template scale and offset on the view
+
+    private float tx(float x) { return mTx + x * mTs; }
+    private float ty(float y) { return mTy + y * mTs; }
+
+    private void drawMapScreen(Canvas c, float w, float h)
+    {
+        Expansion.MapScreen ms = mExp.mapScreen;
+        c.drawColor(ms.fill);
+        Bitmap tpl = mExp.image(ms.template);
+        if (tpl == null) {
+            text(c, ms.template + "?", w / 2, h / 2, h * 0.03f, mExp.label, w * 0.8f, Paint.Align.CENTER);
+            return;
+        }
+        // Keep the template's own proportions: fit, centre, fill the rest
+        mTs = Math.min(w / tpl.getWidth(), h / tpl.getHeight());
+        mTx = (w - tpl.getWidth() * mTs) / 2;
+        mTy = (h - tpl.getHeight() * mTs) / 2;
+        mBox.set(mTx, mTy, mTx + tpl.getWidth() * mTs, mTy + tpl.getHeight() * mTs);
+        mPaint.setAlpha(255);
+        c.drawBitmap(tpl, null, mBox, mPaint);
+
+        RectF area = new RectF(tx(ms.mapRect[0]), ty(ms.mapRect[1]), tx(ms.mapRect[2]), ty(ms.mapRect[3]));
+        if (mConfirmQuit) {
+            drawConfirm(c, area.left, area.top, area.right, area.bottom);
+        } else if (!mValid) {
+            text(c, "Esperando o jogo…", area.centerX(), area.centerY(), area.height() * 0.06f, mExp.label, area.width() * 0.8f, Paint.Align.CENTER);
+        } else {
+            drawMap(c, ms, tpl, area);
+        }
+
+        // World name, two lines: first word / the rest
+        String name = (mValid ? mReader.format(ms.titleValue) : mExp.game).toUpperCase(Locale.US).trim();
+        int sp = name.indexOf(' ');
+        String l1 = sp > 0 ? name.substring(0, sp) : name, l2 = sp > 0 ? name.substring(sp + 1) : "";
+        int n = mExp.titleColors.length;
+        float size = ms.titleSize * mTs, cx = tx(ms.titleX), cy = ty(ms.titleY);
+        if (l2.isEmpty()) {
+            text(c, l1, cx, cy, size, n > 0 ? mExp.titleColors[0] : mExp.text, ms.titleW * mTs, Paint.Align.CENTER);
+        } else {
+            text(c, l1, cx, cy - size * 0.52f, size, n > 0 ? mExp.titleColors[0] : mExp.text, ms.titleW * mTs, Paint.Align.CENTER);
+            text(c, l2, cx, cy + size * 0.52f, size, n > 1 ? mExp.titleColors[1] : mExp.text, ms.titleW * mTs, Paint.Align.CENTER);
+        }
+        mTitleRect.set(cx - ms.titleW * mTs / 2, cy - size * 1.1f, cx + ms.titleW * mTs / 2, cy + size * 1.1f);
+
+        // Slots: icon + value in the template's circles
+        if (mValid) {
+            for (Expansion.Slot sl : ms.slots) {
+                float r = sl.r * mTs, x = tx(sl.x), y = ty(sl.y);
+                Bitmap icon = mExp.image(sl.icon);
+                if (icon != null) {
+                    fit(icon, x, y - r * 0.14f, r * 1.1f);
+                    c.drawBitmap(icon, null, mBox, mPaint);
+                }
+                text(c, mReader.format(sl.value), x, y + r * 0.56f, r * 0.42f, mExp.text, r * 1.7f, Paint.Align.CENTER);
+            }
+        }
+
+        // Tabs
+        for (int i = 0; i < ms.tabs.size(); i++) {
+            Expansion.Tab t = ms.tabs.get(i);
+            RectF r = mTabRects[i];
+            r.set(tx(t.x), ty(t.y), tx(t.x + t.w), ty(t.y + t.h));
+            boolean on = "screen:map".equals(t.action);
+            text(c, t.label.toUpperCase(Locale.US), r.centerX(), r.centerY(), r.height() * 0.27f,
+                    on ? mExp.text : mExp.label, r.width() * 0.84f, Paint.Align.CENTER);
+            if (on) {
+                mPaint.setColor(mExp.accent);
+                float uw = r.width() * 0.36f, uy = r.centerY() + r.height() * 0.28f;
+                c.drawRoundRect(r.centerX() - uw, uy, r.centerX() + uw, uy + r.height() * 0.045f, 4, 4, mPaint);
+            }
+        }
+    }
+
+    private void drawMap(Canvas c, Expansion.MapScreen ms, Bitmap tpl, RectF area)
+    {
+        Long mapId = mReader.number(ms.mapValue);
+        Expansion.MapImage mi = mapId != null ? ms.imageFor(mapId) : null;
+        if (mi == null && ms.maps.size() == 1 && ms.maps.get(0).ids.length == 0) mi = ms.maps.get(0);
+        Bitmap map = mi != null ? mExp.image(mi.image) : null;
+        if (map == null) {
+            text(c, "Sem mapa desta área", area.centerX(), area.centerY(), area.height() * 0.06f, mExp.label, area.width() * 0.8f, Paint.Align.CENTER);
+            return;
+        }
+
+        mShownMap = mi;
+        mShownMapW = map.getWidth();
+        mShownMapH = map.getHeight();
+
+        // Player position on the map picture (map pixels), if known
+        Long gx = mReader.number(ms.xValue), gz = mReader.number(ms.zValue);
+        double[] aff = calibration(mi);
+        boolean havePos = !mCalibrating && aff != null && gx != null && gz != null;
+        float px = havePos ? (float) (aff[0] * gx + aff[1] * gz + aff[2]) : mi.centerX * map.getWidth();
+        float py = havePos ? (float) (aff[3] * gx + aff[4] * gz + aff[5]) : mi.centerY * map.getHeight();
+
+        if (mi != mTrailMap) { mTrailCount = 0; mTrailMap = mi; }
+        if (havePos) {
+            float lx = mTrailCount > 0 ? mTrailX[mTrailCount - 1] : Float.NaN, ly = mTrailCount > 0 ? mTrailY[mTrailCount - 1] : Float.NaN;
+            if (mTrailCount == 0 || Math.hypot(px - lx, py - ly) > map.getWidth() * 0.012f) {
+                if (mTrailCount == mTrailX.length) {
+                    System.arraycopy(mTrailX, 1, mTrailX, 0, mTrailCount - 1);
+                    System.arraycopy(mTrailY, 1, mTrailY, 0, mTrailCount - 1);
+                    mTrailCount--;
+                }
+                mTrailX[mTrailCount] = px; mTrailY[mTrailCount] = py; mTrailCount++;
+            }
+        }
+
+        float k = Math.min(area.width() / map.getWidth(), area.height() / map.getHeight());
+        float cx = area.centerX(), cy = area.centerY();
+        float ox, oy;
+        if (mCalibrating) {
+            // Whole map, no zoom, so the player's spot can be tapped
+            ox = cx - map.getWidth() * k / 2;
+            oy = cy - map.getHeight() * k / 2;
+        } else {
+            k *= ms.zoom;
+            ox = cx - px * k;
+            oy = cy - py * k;
+        }
+        mMapK = k; mMapOx = ox; mMapOy = oy;
+        mMapArea.set(area);
+
+        // Draw the map clipped to the parchment (mask image, else the rectangle)
+        int layer = c.saveLayer(area.left, area.top, area.right, area.bottom, null);
+        c.clipRect(area);
+        mBox.set(ox, oy, ox + map.getWidth() * k, oy + map.getHeight() * k);
+        mPaint.setAlpha(255);
+        c.drawBitmap(map, null, mBox, mPaint);
+        Bitmap mask = mExp.image(ms.mask);
+        if (mask != null) {
+            Paint mp = new Paint(Paint.FILTER_BITMAP_FLAG);
+            mp.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN));
+            mBox.set(mTx, mTy, mTx + tpl.getWidth() * mTs, mTy + tpl.getHeight() * mTs);
+            c.drawBitmap(mask, null, mBox, mp);
+        }
+        c.restoreToCount(layer);
+
+        if (mCalibrating) {
+            String msg = gx == null || gz == null ? "Calibrar: a posição do jogador não pôde ser lida"
+                    : "Calibrar (" + (mCalPoints.size() + 1) + "/3): toque onde o personagem está";
+            banner(c, msg, area);
+            return;
+        }
+        if (!havePos) {
+            banner(c, gx == null || gz == null ? "Posição do jogador: não encontrada"
+                    : "Segure o mapa para calibrar", area);
+            return;
+        }
+
+        // Trail (older = fainter), then the arrow
+        for (int i = 0; i < mTrailCount - 1; i++) {
+            mPaint.setColor(0xFFFFFFFF);
+            mPaint.setAlpha(90 + 50 * i);
+            c.drawCircle(ox + mTrailX[i] * k, oy + mTrailY[i] * k, area.width() * (0.008f + 0.002f * i), mPaint);
+        }
+        mPaint.setAlpha(255);
+        float r = area.width() * 0.042f;
+        mPaint.setColor(0x50FFFFFF);
+        c.drawCircle(cx, cy, r, mPaint);
+        Long yaw = mReader.number(ms.yawValue);
+        if (yaw == null) {
+            // Direction unknown: a round pin
+            mPaint.setColor(0xFFE8432E);
+            c.drawCircle(cx, cy, r * 0.55f, mPaint);
+            mPaint.setStyle(Paint.Style.STROKE);
+            mPaint.setStrokeWidth(r * 0.14f);
+            mPaint.setColor(0xFFFFFFFF);
+            c.drawCircle(cx, cy, r * 0.55f, mPaint);
+            mPaint.setStyle(Paint.Style.FILL);
+            return;
+        }
+        float deg = (ms.yawClockwise ? yaw : -yaw) + ms.yawOffset;
+        c.save();
+        c.rotate(deg, cx, cy);
+        mPath.reset();
+        mPath.moveTo(cx + r * 0.95f, cy);
+        mPath.lineTo(cx - r * 0.6f, cy - r * 0.65f);
+        mPath.lineTo(cx - r * 0.3f, cy);
+        mPath.lineTo(cx - r * 0.6f, cy + r * 0.65f);
+        mPath.close();
+        mPaint.setColor(0xFFE8432E);
+        c.drawPath(mPath, mPaint);
+        mPaint.setStyle(Paint.Style.STROKE);
+        mPaint.setStrokeJoin(Paint.Join.ROUND);
+        mPaint.setStrokeWidth(r * 0.12f);
+        mPaint.setColor(0xFFFFFFFF);
+        c.drawPath(mPath, mPaint);
+        mPaint.setStyle(Paint.Style.FILL);
+        c.restore();
+    }
+
+    // --- Map calibration: hold the map, then tap where the player is, in 3 places ---------------
+
+    private boolean mCalibrating;
+    private final java.util.List<double[]> mCalPoints = new java.util.ArrayList<>();
+    private Expansion.MapImage mShownMap;
+    private int mShownMapW, mShownMapH;
+    private float mMapK, mMapOx, mMapOy;
+    private final RectF mMapArea = new RectF();
+    private final java.util.Map<Expansion.MapImage, double[]> mCalCache = new java.util.HashMap<>();
+
+    private android.content.SharedPreferences prefs()
+    {
+        return getContext().getSharedPreferences("expansion_maps", Context.MODE_PRIVATE);
+    }
+
+    private String calKey(Expansion.MapImage mi) { return mExp.id + "|" + mi.image; }
+
+    /** The user's own calibration for this map if there is one, else the expansion's. */
+    private double[] calibration(Expansion.MapImage mi)
+    {
+        if (mCalCache.containsKey(mi)) return mCalCache.get(mi);
+        double[] aff = mi.affine;
+        String saved = prefs().getString(calKey(mi), null);
+        if (saved != null) {
+            try {
+                String[] parts = saved.split(",");
+                double[] v = new double[6];
+                for (int i = 0; i < 6; i++) v[i] = Double.parseDouble(parts[i]);
+                aff = v;
+            } catch (Exception ignored) {}
+        }
+        mCalCache.put(mi, aff);
+        return aff;
+    }
+
+    private void startCalibration()
+    {
+        mCalibrating = true;
+        mCalPoints.clear();
+        invalidate();
+    }
+
+    private void calibrationTap(float x, float y)
+    {
+        Long gx = mReader.number(mExp.mapScreen.xValue), gz = mReader.number(mExp.mapScreen.zValue);
+        if (mShownMap == null || gx == null || gz == null || mMapK <= 0) return;
+        double px = (x - mMapOx) / mMapK, py = (y - mMapOy) / mMapK;
+        mCalPoints.add(new double[]{gx, gz, px, py});
+        if (mCalPoints.size() < 3) {
+            android.widget.Toast.makeText(getContext(), "Ponto " + mCalPoints.size() + " salvo. Ande até outro lugar.",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            invalidate();
+            return;
+        }
+        double[] aff = Expansion.affine(mCalPoints.toArray(new double[0][]));
+        mCalibrating = false;
+        if (aff == null) {
+            android.widget.Toast.makeText(getContext(), "Pontos muito próximos ou em linha. Tente de novo.",
+                    android.widget.Toast.LENGTH_LONG).show();
+        } else {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 6; i++) sb.append(i > 0 ? "," : "").append(aff[i]);
+            prefs().edit().putString(calKey(mShownMap), sb.toString()).apply();
+            mCalCache.put(mShownMap, aff);
+            mTrailCount = 0;
+            android.widget.Toast.makeText(getContext(), "Mapa calibrado", android.widget.Toast.LENGTH_SHORT).show();
+        }
+        invalidate();
+    }
+
+    private void banner(Canvas c, String msg, RectF area)
+    {
+        float bh = area.height() * 0.075f;
+        mBox.set(area.left + area.width() * 0.06f, area.bottom - bh * 1.5f, area.right - area.width() * 0.06f, area.bottom - bh * 0.5f);
+        mPaint.setColor(0xC0201005);
+        c.drawRoundRect(mBox, bh * 0.3f, bh * 0.3f, mPaint);
+        text(c, msg, mBox.centerX(), mBox.centerY(), bh * 0.45f, 0xFFFFFFFF, mBox.width() * 0.92f, Paint.Align.CENTER);
     }
 
     /** Title sign: each word gets the next of the theme's title colours. */
@@ -317,12 +622,62 @@ public class ExpansionView extends View
     // Touch and lifecycle
     // ---------------------------------------------------------------------------------------------
 
+    private final Runnable mLongPress = this::onLongPress;
+    private final Runnable mMapLongPress = () -> { mLongPressed = true; startCalibration(); };
+
+    private void onLongPress()
+    {
+        mLongPressed = true;
+        MemorySnapshot.save(getContext(), mExp.id);
+    }
+    private boolean mLongPressed;
+
     @Override
     public boolean onTouchEvent(MotionEvent e)
     {
-        if (e.getActionMasked() == MotionEvent.ACTION_DOWN) return true;
-        if (e.getActionMasked() != MotionEvent.ACTION_UP) return super.onTouchEvent(e);
         float x = e.getX(), y = e.getY();
+        switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                // Hold the world name: save a memory snapshot (for writing expansions)
+                mLongPressed = false;
+                if (mTitleRect.contains(x, y)) mHandler.postDelayed(mLongPress, 800);
+                else if (mOnMap && !mConfirmQuit && mMapArea.contains(x, y)) mHandler.postDelayed(mMapLongPress, 800);
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                mHandler.removeCallbacks(mLongPress);
+                mHandler.removeCallbacks(mMapLongPress);
+                return true;
+            case MotionEvent.ACTION_UP:
+                mHandler.removeCallbacks(mLongPress);
+                mHandler.removeCallbacks(mMapLongPress);
+                if (mLongPressed) return true;
+                break;
+            default:
+                return super.onTouchEvent(e);
+        }
+        if (mOnMap && mCalibrating && mMapArea.contains(x, y)) {
+            calibrationTap(x, y);
+            return true;
+        }
+        if (mOnMap && mExp.mapScreen != null && !mConfirmQuit) {
+            for (int i = 0; i < mTabRects.length; i++) {
+                if (!mTabRects[i].contains(x, y)) continue;
+                String action = mExp.mapScreen.tabs.get(i).action;
+                mCalibrating = false;
+                if ("screen:main".equals(action)) mOnMap = false;
+                else if ("menu".equals(action)) { if (mOpenMenu != null) mOpenMenu.run(); }
+                else if ("save_quit".equals(action)) mConfirmQuit = true;
+                invalidate();
+                performClick();
+                return true;
+            }
+            return true;
+        }
+        if (!mOnMap && mMapBtnRect.contains(x, y)) {
+            mOnMap = true;
+            invalidate();
+            return true;
+        }
         if (mConfirmQuit) {
             if (mYesRect.contains(x, y)) { mConfirmQuit = false; if (mSaveAndQuit != null) mSaveAndQuit.run(); }
             else if (mNoRect.contains(x, y)) mConfirmQuit = false;
@@ -360,6 +715,7 @@ public class ExpansionView extends View
     {
         mRunning = false;
         mHandler.removeCallbacks(mRefresh);
+        mHandler.removeCallbacks(mLongPress);
         super.onDetachedFromWindow();
     }
 }

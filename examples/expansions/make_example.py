@@ -37,6 +37,36 @@ values = {
     "blue_eggs": cons(0), "fire_eggs": cons(1), "red_feathers": cons(6), "gold_feathers": cons(7),
 }
 
+def arr2(name):
+    m = re.search(r'static final int\[\]\[\] ' + name + r'\s*=\s*\{(.*?)\};', java, re.S)
+    return [[int(x, 16) for x in re.findall(r'0x[0-9A-Fa-f]+', row)] for row in re.findall(r'\{([^{}]*)\}', m.group(1))]
+
+# --- Values for the map page: this world's collectibles -------------------------------------
+J, NN, TC = arr('JIGGY_FLAGS'), arr('NOTE_NEST_FLAGS'), arr('TREBLE_CLEF_FLAGS')
+HC, PG, MV = arr2('WORLD_HONEYCOMB_FLAGS'), arr2('WORLD_PAGE_FLAGS'), arr2('WORLD_MOVE_FLAGS')
+values["world_idx"] = {"type": "lookup", "value": "map", "keep_last": True, "default": -1,
+                       "table": {"0x%X" % k: v for k, v in sorted(map_world.items())}}
+for i in range(9):
+    jb = J[i*10:(i+1)*10] if i < 8 else J[80:] + arr('JINJO_FAMILY_JIGGY_FLAGS')
+    values["w%d_jiggies" % i] = dict(type="flags", bits=jb, **FLAGS)
+    values["w%d_nests" % i] = dict(type="flags", bits=NN[i*16:(i+1)*16], **FLAGS)
+    values["w%d_clef" % i] = dict(type="flags", bits=[TC[i]], **FLAGS)
+    values["w%d_notes" % i] = {"type": "sum", "terms": [{"value": "w%d_nests" % i, "times": 5}, {"value": "w%d_clef" % i, "times": 20}]}
+    values["w%d_honey" % i] = dict(type="flags", bits=HC[i], **FLAGS)
+    values["w%d_pages" % i] = dict(type="flags", bits=PG[i], **FLAGS)
+    values["w%d_moves" % i] = dict(type="flags", bits=MV[i], **FLAGS)
+    values["w%d_jiggies_max" % i] = {"type": "const", "value": len(jb)}
+    values["w%d_honey_max" % i] = {"type": "const", "value": len(HC[i])}
+    values["w%d_pages_max" % i] = {"type": "const", "value": len(PG[i])}
+    values["w%d_moves_max" % i] = {"type": "const", "value": len(MV[i])}
+for name in ["jiggies", "notes", "honey", "pages", "moves", "jiggies_max", "honey_max", "pages_max", "moves_max"]:
+    values["here_" + name] = {"type": "select", "index": "world_idx", "options": ["w%d_%s" % (i, name) for i in range(9)], "default": "-"}
+
+# Player position: player pointer table [0x80135490 + 4 * index] -> +0xE4 -> x, y, z (floats)
+values["player_index"] = {"type": "u8", "addr": "0x801354DF"}
+for axis, off in (("x", "0"), ("y", "4"), ("z", "8")):
+    values["pos_" + axis] = {"type": "f32", "chain": ["0x80135490", {"value": "player_index", "times": 4}, "*", "0xE4", "*", off]}
+
 manifest = {
     "format": 1,
     "id": "banjotooie-usa-exemplo",
@@ -73,6 +103,38 @@ manifest = {
             {"icon": "icons/egg_fire.png", "value": "{fire_eggs}"},
         ]},
     },
+    "map_screen": {
+        "template": "images/map_template.jpg",
+        "mask": "images/map_mask.png",
+        "fill": "#2A1709",
+        "title": {"x": 205, "y": 120, "w": 320, "size": 58, "value": "{world}"},
+        "map": {
+            "rect": [228, 58, 1158, 892],
+            "zoom": 2.0,
+            "map_value": "map",
+            "x": "pos_x", "z": "pos_z",
+            "images": [
+                {"image": "maps/mayahem_temple.png", "ids": ["0xB8"], "center": [0.5, 0.45]}
+            ]
+        },
+        "slots": [
+            {"x": 110, "y": 270, "r": 72, "icon": "icons/jiggy.png", "value": "{here_jiggies}/{here_jiggies_max}"},
+            {"x": 108, "y": 408, "r": 72, "icon": "icons/note.png", "value": "{here_notes}/100"},
+            {"x": 106, "y": 545, "r": 72, "icon": "icons/honeycomb.png", "value": "{here_honey}/{here_honey_max}"},
+            {"x": 102, "y": 682, "r": 72, "icon": "icons/page.png", "value": "{here_pages}/{here_pages_max}"},
+            {"x": 98, "y": 820, "r": 72, "icon": "icons/moves.png", "value": "{here_moves}/{here_moves_max}"},
+            {"x": 1293, "y": 360, "r": 100, "icon": "icons/feather_red.png", "value": "{red_feathers}"},
+            {"x": 1300, "y": 550, "r": 100, "icon": "icons/feather_gold.png", "value": "{gold_feathers}"},
+            {"x": 1315, "y": 752, "r": 100, "icon": "icons/egg_blue.png", "value": "{blue_eggs}"}
+        ],
+        "tabs": [
+            {"x": 10, "y": 925, "w": 262, "h": 150, "label": "Painel", "action": "screen:main"},
+            {"x": 280, "y": 925, "w": 282, "h": 150, "label": "Mapa", "action": "screen:map"},
+            {"x": 573, "y": 925, "w": 284, "h": 150, "label": "Golpes", "action": "screen:main"},
+            {"x": 862, "y": 925, "w": 282, "h": 150, "label": "Opções", "action": "menu"},
+            {"x": 1150, "y": 925, "w": 275, "h": 150, "label": "Salvar e sair", "action": "save_quit"}
+        ]
+    },
     "values": values,
 }
 
@@ -85,10 +147,28 @@ files = {
     "icons/feather_red.png": "bt_feather_red.png", "icons/feather_gold.png": "bt_feather_gold.png",
     "icons/egg_blue.png": "bt_egg_blue.png", "icons/egg_fire.png": "bt_egg_fire.png",
 }
+# Map page art: the user's template (as JPEG), the parchment mask, the Mayahem Temple map
+import numpy as np
+from PIL import Image, ImageFilter
+HERE = os.path.dirname(os.path.abspath(__file__))
+tpl = Image.open(HERE + '/map_template.png').convert('RGB')
+tpl.save('/tmp/_map_template.jpg', quality=92)
+a = np.array(tpl).astype(int); H_, W_ = a.shape[:2]
+paper = (a[:, :, 0] > 175) & (a[:, :, 1] > 110) & (a[:, :, 2] < 190)
+yy, xx = np.mgrid[0:H_, 0:W_]
+paper &= (xx > 225) & (xx < 1160) & (yy < 900)
+mk = Image.fromarray((paper * 255).astype('uint8')).filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.MinFilter(15)).filter(ImageFilter.GaussianBlur(2))
+mask = Image.new('RGBA', mk.size, (255, 255, 255, 0)); mask.putalpha(mk); mask.save('/tmp/_map_mask.png', optimize=True)
+Image.open(HERE + '/mayahem_cut.png').save('/tmp/_mayahem.png', optimize=True)
+EXTRA = {"images/map_template.jpg": "/tmp/_map_template.jpg", "images/map_mask.png": "/tmp/_map_mask.png",
+         "maps/mayahem_temple.png": "/tmp/_mayahem.png"}
+
 with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED) as z:
     z.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     for dst, src in files.items():
         z.write(ART + src, dst)
     z.write(FONT, "fonts/LilitaOne-Regular.ttf")
+    for dst, src in EXTRA.items():
+        z.write(src, dst)
     z.write(os.path.dirname(FONT) + "/LilitaOne-OFL.txt", "fonts/OFL.txt")
 print(OUT, os.path.getsize(OUT), "bytes")
