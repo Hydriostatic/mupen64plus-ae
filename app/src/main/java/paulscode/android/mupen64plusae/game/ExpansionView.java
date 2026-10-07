@@ -180,7 +180,7 @@ public class ExpansionView extends View
         if (mConfirmQuit) {
             drawConfirm(c, pad, tilesTop, w - pad, tilesBottom);
         } else if (!mValid) {
-            text(c, "Esperando o jogo…", w / 2, (tilesTop + tilesBottom) / 2, h * 0.035f, mExp.label, w * 0.8f, Paint.Align.CENTER);
+            text(c, "Waiting for the game…", w / 2, (tilesTop + tilesBottom) / 2, h * 0.035f, mExp.label, w * 0.8f, Paint.Align.CENTER);
         } else {
             drawTiles(c, pad, tilesTop, w - pad, tilesBottom);
             if (hasBar) drawBar(c, pad, barTop, w - pad, barBottom);
@@ -196,7 +196,7 @@ public class ExpansionView extends View
         if (map) {
             mMapBtnRect.set(x0, btnTop, x0 + bw, btnTop + btnH);
             piece(c, mExp.buttonImage, mMapBtnRect.left, mMapBtnRect.top, mMapBtnRect.right, mMapBtnRect.bottom, mExp.panel);
-            text(c, "MAPA", mMapBtnRect.centerX(), mMapBtnRect.centerY(), btnH * 0.4f, mExp.text, bw * 0.8f, Paint.Align.CENTER);
+            text(c, "MAP", mMapBtnRect.centerX(), mMapBtnRect.centerY(), btnH * 0.4f, mExp.text, bw * 0.8f, Paint.Align.CENTER);
             x0 += bw + gap;
         } else {
             mMapBtnRect.setEmpty();
@@ -205,8 +205,8 @@ public class ExpansionView extends View
         mQuitRect.set(x0 + bw + gap, btnTop, w - pad, btnTop + btnH);
         piece(c, mExp.buttonImage, mMenuRect.left, mMenuRect.top, mMenuRect.right, mMenuRect.bottom, mExp.panel);
         piece(c, mExp.buttonImage, mQuitRect.left, mQuitRect.top, mQuitRect.right, mQuitRect.bottom, mExp.panel);
-        text(c, "OPÇÕES", mMenuRect.centerX(), mMenuRect.centerY(), btnH * 0.4f, mExp.text, bw * 0.8f, Paint.Align.CENTER);
-        text(c, "SALVAR E SAIR", mQuitRect.centerX(), mQuitRect.centerY(), btnH * 0.4f, mExp.text, bw * 0.8f, Paint.Align.CENTER);
+        text(c, "OPTIONS", mMenuRect.centerX(), mMenuRect.centerY(), btnH * 0.4f, mExp.text, bw * 0.8f, Paint.Align.CENTER);
+        text(c, "SAVE AND QUIT", mQuitRect.centerX(), mQuitRect.centerY(), btnH * 0.4f, mExp.text, bw * 0.8f, Paint.Align.CENTER);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -240,7 +240,7 @@ public class ExpansionView extends View
         if (mConfirmQuit) {
             drawConfirm(c, area.left, area.top, area.right, area.bottom);
         } else if (!mValid) {
-            text(c, "Esperando o jogo…", area.centerX(), area.centerY(), area.height() * 0.06f, mExp.label, area.width() * 0.8f, Paint.Align.CENTER);
+            text(c, "Waiting for the game…", area.centerX(), area.centerY(), area.height() * 0.06f, mExp.label, area.width() * 0.8f, Paint.Align.CENTER);
         } else {
             drawMap(c, ms, tpl, area);
         }
@@ -295,7 +295,7 @@ public class ExpansionView extends View
         if (mi == null && ms.maps.size() == 1 && ms.maps.get(0).ids.length == 0) mi = ms.maps.get(0);
         Bitmap map = mi != null ? mExp.image(mi.image) : null;
         if (map == null) {
-            text(c, "Sem mapa desta área", area.centerX(), area.centerY(), area.height() * 0.06f, mExp.label, area.width() * 0.8f, Paint.Align.CENTER);
+            text(c, "No map for this area", area.centerX(), area.centerY(), area.height() * 0.06f, mExp.label, area.width() * 0.8f, Paint.Align.CENTER);
             return;
         }
 
@@ -355,14 +355,14 @@ public class ExpansionView extends View
         c.restoreToCount(layer);
 
         if (mCalibrating) {
-            String msg = gx == null || gz == null ? "Calibrar: a posição do jogador não pôde ser lida"
-                    : "Calibrar (" + (mCalPoints.size() + 1) + "/3): toque onde o personagem está";
+            String msg = gx == null || gz == null ? "Calibrate: can't read the player's position"
+                    : "Calibrate (" + (mCalPoints.size() + 1) + "/3): tap where the player is";
             banner(c, msg, area);
             return;
         }
         if (!havePos) {
-            banner(c, gx == null || gz == null ? "Posição do jogador: não encontrada"
-                    : "Ajustando o mapa sozinho… ande um pouco", area);
+            banner(c, gx == null || gz == null ? "Player position not found"
+                    : "Fitting the map… walk around a bit", area);
             return;
         }
 
@@ -508,7 +508,7 @@ public class ExpansionView extends View
         double px = (x - mMapOx) / mMapK, py = (y - mMapOy) / mMapK;
         mCalPoints.add(new double[]{gx, gz, px, py});
         if (mCalPoints.size() < 3) {
-            android.widget.Toast.makeText(getContext(), "Ponto " + mCalPoints.size() + " salvo. Ande até outro lugar.",
+            android.widget.Toast.makeText(getContext(), "Point " + mCalPoints.size() + " saved. Walk somewhere else.",
                     android.widget.Toast.LENGTH_SHORT).show();
             invalidate();
             return;
@@ -516,7 +516,7 @@ public class ExpansionView extends View
         double[] aff = Expansion.affine(mCalPoints.toArray(new double[0][]));
         mCalibrating = false;
         if (aff == null) {
-            android.widget.Toast.makeText(getContext(), "Pontos muito próximos ou em linha. Tente de novo.",
+            android.widget.Toast.makeText(getContext(), "Points too close or in a line. Try again.",
                     android.widget.Toast.LENGTH_LONG).show();
         } else {
             StringBuilder sb = new StringBuilder();
@@ -524,7 +524,7 @@ public class ExpansionView extends View
             prefs().edit().putString(calKey(mShownMap), sb.toString()).apply();
             mCalCache.put(mShownMap, aff);
             mTrailCount = 0;
-            android.widget.Toast.makeText(getContext(), "Mapa calibrado", android.widget.Toast.LENGTH_SHORT).show();
+            android.widget.Toast.makeText(getContext(), "Map calibrated", android.widget.Toast.LENGTH_SHORT).show();
         }
         invalidate();
     }
@@ -629,7 +629,7 @@ public class ExpansionView extends View
     {
         float h = b - t, w = r - l;
         piece(c, mExp.tileImage, l + w * 0.1f, t + h * 0.2f, r - w * 0.1f, b - h * 0.2f, mExp.panel);
-        text(c, "Salvar e sair do jogo?", (l + r) / 2, t + h * 0.4f, h * 0.06f, mExp.text, w * 0.7f, Paint.Align.CENTER);
+        text(c, "Save and quit the game?", (l + r) / 2, t + h * 0.4f, h * 0.06f, mExp.text, w * 0.7f, Paint.Align.CENTER);
         float bw = w * 0.25f, bh = h * 0.12f, by = t + h * 0.55f;
         mYesRect.set((l + r) / 2 - bw - w * 0.02f, by, (l + r) / 2 - w * 0.02f, by + bh);
         mNoRect.set((l + r) / 2 + w * 0.02f, by, (l + r) / 2 + bw + w * 0.02f, by + bh);
@@ -637,8 +637,8 @@ public class ExpansionView extends View
         c.drawRoundRect(mYesRect, bh * 0.25f, bh * 0.25f, mPaint);
         mPaint.setColor(0xFF9C2A1E);
         c.drawRoundRect(mNoRect, bh * 0.25f, bh * 0.25f, mPaint);
-        text(c, "SIM", mYesRect.centerX(), mYesRect.centerY(), bh * 0.45f, 0xFFFFFFFF, bw * 0.8f, Paint.Align.CENTER);
-        text(c, "NÃO", mNoRect.centerX(), mNoRect.centerY(), bh * 0.45f, 0xFFFFFFFF, bw * 0.8f, Paint.Align.CENTER);
+        text(c, "YES", mYesRect.centerX(), mYesRect.centerY(), bh * 0.45f, 0xFFFFFFFF, bw * 0.8f, Paint.Align.CENTER);
+        text(c, "NO", mNoRect.centerX(), mNoRect.centerY(), bh * 0.45f, 0xFFFFFFFF, bw * 0.8f, Paint.Align.CENTER);
     }
 
     /** mBox = icon fitted (keeping its shape) in a square of side s around (cx, cy). */

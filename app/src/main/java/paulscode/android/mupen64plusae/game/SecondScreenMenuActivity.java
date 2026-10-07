@@ -141,7 +141,12 @@ public class SecondScreenMenuActivity extends Activity
         FrameLayout root = new FrameLayout(ctx);
         root.setBackgroundColor(BACKGROUND_GREY);
 
-        // App icon behind everything, blurred and half transparent, visible through the menus
+        if (!inGame) {
+            // App menus: the bright cartridge-era theme (cream, confetti, colour bands)
+            root.setBackground(new paulscode.android.mupen64plusae.N64Theme.BackgroundDrawable(dp));
+        }
+
+        // In-game: the app icon behind everything, blurred and half transparent
         ImageView logo = new ImageView(ctx);
         logo.setImageResource(R.mipmap.ic_launcher_foreground);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -153,7 +158,7 @@ public class SecondScreenMenuActivity extends Activity
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
         int logoSize = Math.round(Math.min(screenWidth, screenHeight) * 1.1f);
-        root.addView(logo, new FrameLayout.LayoutParams(logoSize, logoSize, Gravity.CENTER));
+        if (inGame) root.addView(logo, new FrameLayout.LayoutParams(logoSize, logoSize, Gravity.CENTER));
 
         // The menus use the whole (small) screen
         LinearLayout column = new LinearLayout(ctx);

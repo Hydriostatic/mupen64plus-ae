@@ -21,7 +21,7 @@ import paulscode.android.mupen64plusae.ActivityHelper;
 public class LocaleDialog extends DialogFragment
 {
     public static final String KEY_LOCALE_OVERRIDE = "localeOverride";
-    public static final String DEFAULT_LOCALE_OVERRIDE = "";
+    public static final String DEFAULT_LOCALE_OVERRIDE = "en"; // M64-DS: English unless another language is picked
     private static final String STATE_TITLE = "STATE_TITLE";
 
     private SharedPreferences mPreferences;

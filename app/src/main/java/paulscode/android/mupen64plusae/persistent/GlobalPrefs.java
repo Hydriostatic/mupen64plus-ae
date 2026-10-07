@@ -435,7 +435,7 @@ public class GlobalPrefs
     public static final String DEFAULT_TOUCHSCREEN_PROFILE_DEFAULT = "Analog";
     public static final String DEFAULT_TOUCHSCREEN_DPAD_PROFILE_DEFAULT = "Everything";
     static final String DEFAULT_CONTROLLER_PROFILE_DEFAULT = "Android Gamepad";
-    public static final String DEFAULT_LOCALE_OVERRIDE = "";
+    public static final String DEFAULT_LOCALE_OVERRIDE = "en"; // M64-DS: English unless another language is picked
     // ... add more as needed
 
     private final SharedPreferences mPreferences;

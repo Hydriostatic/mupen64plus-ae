@@ -61,8 +61,8 @@ import java.util.List;
  */
 public class GalleryHomePanel extends FrameLayout
 {
-    private static final int TEXT = 0xFFF2F2F2;
-    private static final int MUTED = 0xFFB8B8B8;
+    private static final int TEXT = N64Theme.INK;      // text on paper (popups, search)
+    private static final int MUTED = 0xFF5A5468;
     private static final int ACCENT = 0xFF3249BC;   // @color/blue1, the app's floating-button colour
     private static final int FOCUS = 0xFF5C78FF;
 
@@ -95,15 +95,20 @@ public class GalleryHomePanel extends FrameLayout
     {
         LinearLayout column = new LinearLayout(ctx);
         column.setOrientation(LinearLayout.VERTICAL);
-        column.setPadding(dp(8), dp(8), dp(8), dp(8));
+        column.setPadding(dp(8), dp(6), dp(8), dp(8));
         addView(column, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // Cartridge header
+        LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(70));
+        headerLp.bottomMargin = dp(6);
+        column.addView(new N64Theme.HeaderView(ctx, ctx.getString(R.string.app_name)), headerLp);
 
         // Search bar (hidden until the magnifier button is pressed)
         mSearchBar = new LinearLayout(ctx);
         mSearchBar.setOrientation(LinearLayout.HORIZONTAL);
         mSearchBar.setGravity(Gravity.CENTER_VERTICAL);
         mSearchBar.setPadding(dp(10), 0, dp(4), 0);
-        mSearchBar.setBackground(rounded(0xE6202020, dp(22), 0x55FFFFFF));
+        mSearchBar.setBackground(paper(dp(22)));
         mSearchBar.setVisibility(View.GONE);
         ImageView lens = new ImageView(ctx);
         lens.setImageResource(android.R.drawable.ic_menu_search);
@@ -111,7 +116,8 @@ public class GalleryHomePanel extends FrameLayout
         mSearchBar.addView(lens, new LinearLayout.LayoutParams(dp(24), dp(24)));
         mSearchField = new EditText(ctx);
         mSearchField.setHint(R.string.actionSearchRoms);
-        mSearchField.setHintTextColor(0xFF8A8A8A);
+        mSearchField.setHintTextColor(0xFF8A8270);
+        mSearchField.setTypeface(N64Theme.font(ctx));
         mSearchField.setTextColor(TEXT);
         mSearchField.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         mSearchField.setSingleLine(true);
@@ -151,12 +157,12 @@ public class GalleryHomePanel extends FrameLayout
                 addRoms = item; // shown as a floating button instead
                 continue;
             }
-            buttons.add(optionButton(ctx, item.getIcon(), item.getTitle(), v -> onOption(item)));
+            buttons.add(optionButton(ctx, outlined(ctx, item.getIcon()), item.getTitle(), buttons.size(), v -> onOption(item)));
         }
-        Drawable expIcon = ctx.getDrawable(android.R.drawable.ic_menu_add);
-        buttons.add(optionButton(ctx, expIcon, ctx.getString(R.string.expansions_title), v -> showExpansions()));
-        Drawable exitIcon = ctx.getDrawable(android.R.drawable.ic_lock_power_off);
-        buttons.add(optionButton(ctx, exitIcon, ctx.getString(R.string.secondScreen_exit), v -> mActivity.exitFromSecondScreen()));
+        Drawable expIcon = N64Theme.outlinedShape(ctx, "plus", dp(40));
+        buttons.add(optionButton(ctx, expIcon, ctx.getString(R.string.expansions_title), buttons.size(), v -> showExpansions()));
+        Drawable exitIcon = N64Theme.outlinedShape(ctx, "power", dp(40));
+        buttons.add(optionButton(ctx, exitIcon, ctx.getString(R.string.secondScreen_exit), buttons.size(), v -> mActivity.exitFromSecondScreen()));
 
         final int columns = 3;
         LinearLayout row = null;
@@ -166,14 +172,14 @@ public class GalleryHomePanel extends FrameLayout
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 grid.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             }
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(92), 1f);
-            lp.setMargins(dp(4), dp(4), dp(4), dp(4));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(108), 1f);
+            lp.setMargins(dp(1), dp(1), dp(1), dp(1));
             row.addView(buttons.get(i), lp);
         }
         int rest = buttons.size() % columns;
         for (int i = 0; rest > 0 && i < columns - rest; i++) {
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(92), 1f);
-            lp.setMargins(dp(4), dp(4), dp(4), dp(4));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(108), 1f);
+            lp.setMargins(dp(1), dp(1), dp(1), dp(1));
             row.addView(new View(ctx), lp);
         }
         if (!buttons.isEmpty()) mFirstButton = buttons.get(0);
@@ -181,42 +187,42 @@ public class GalleryHomePanel extends FrameLayout
         // Floating buttons: search + add ROMs, bottom right (same place as on the main screen)
         LinearLayout fabs = new LinearLayout(ctx);
         fabs.setOrientation(LinearLayout.HORIZONTAL);
-        fabs.addView(fab(ctx, ctx.getDrawable(android.R.drawable.ic_menu_search),
+        fabs.addView(fab(ctx, ctx.getDrawable(android.R.drawable.ic_menu_search), N64Theme.YELLOW,
                 ctx.getString(R.string.actionSearchRoms), v -> openSearch()));
         final MenuItem addItem = addRoms;
-        View add = fab(ctx, ctx.getDrawable(R.drawable.ic_fab_refresh_roms),
+        View add = fab(ctx, ctx.getDrawable(R.drawable.ic_fab_refresh_roms), N64Theme.BLUE,
                 ctx.getString(R.string.menuItem_refreshRoms), v -> {
                     if (addItem != null) mActivity.onOptionsItemSelected(addItem);
                     else mActivity.onFabRefreshRomsClick(v);
                 });
-        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(dp(56), dp(56));
-        addLp.leftMargin = dp(14);
+        LinearLayout.LayoutParams addLp = new LinearLayout.LayoutParams(dp(68), dp(72));
+        addLp.leftMargin = dp(10);
         fabs.addView(add, addLp);
-        ((LinearLayout.LayoutParams) fabs.getChildAt(0).getLayoutParams()).width = dp(56);
-        ((LinearLayout.LayoutParams) fabs.getChildAt(0).getLayoutParams()).height = dp(56);
+        ((LinearLayout.LayoutParams) fabs.getChildAt(0).getLayoutParams()).width = dp(68);
+        ((LinearLayout.LayoutParams) fabs.getChildAt(0).getLayoutParams()).height = dp(72);
         LayoutParams fabsLp = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM | Gravity.END);
-        fabsLp.setMargins(0, 0, dp(16), dp(16));
+        fabsLp.setMargins(0, 0, dp(12), dp(12));
         addView(fabs, fabsLp);
 
         // Popup window for sub-options
         mPopup = new FrameLayout(ctx);
-        mPopup.setBackgroundColor(0xB0000000);
+        mPopup.setBackgroundColor(0x99161628);
         mPopup.setClickable(true);
         mPopup.setOnClickListener(v -> closePopup());
         mPopup.setVisibility(View.GONE);
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(rounded(0xF2262626, dp(18), 0x66FFFFFF));
+        card.setBackground(paper(dp(18)));
         card.setClickable(true); // don't close when tapping inside
         card.setPadding(dp(6), dp(6), dp(6), dp(10));
         LinearLayout head = new LinearLayout(ctx);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(dp(12), dp(6), dp(4), dp(6));
-        mPopupTitle = label(ctx, "", 18, TEXT, true);
+        mPopupTitle = label(ctx, "", 20, TEXT, true);
         head.addView(mPopupTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView close = label(ctx, "✕", 20, MUTED, true);
+        TextView close = label(ctx, "✕", 20, TEXT, true);
         close.setPadding(dp(12), dp(4), dp(12), dp(4));
         close.setOnClickListener(v -> closePopup());
         head.addView(close);
@@ -232,44 +238,55 @@ public class GalleryHomePanel extends FrameLayout
         addView(mPopup, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
-    private View optionButton(Context ctx, Drawable icon, CharSequence title, View.OnClickListener click)
+    private View optionButton(Context ctx, Drawable icon, CharSequence title, int index, View.OnClickListener click)
     {
         LinearLayout b = new LinearLayout(ctx);
         b.setOrientation(LinearLayout.VERTICAL);
         b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(4), dp(8), dp(4), dp(6));
-        b.setBackground(buttonBackground(dp(16)));
+        N64Theme.ChunkyDrawable bg = new N64Theme.ChunkyDrawable(N64Theme.CYCLE[index % N64Theme.CYCLE.length], mDp, 16);
+        b.setBackground(bg);
+        b.setPadding(dp(8), dp(8), dp(8), dp(5) + bg.depth() + dp(4));
         b.setFocusable(true);
         b.setClickable(true);
         b.setOnClickListener(click);
         if (icon != null) {
             ImageView iv = new ImageView(ctx);
-            iv.setImageDrawable(icon.getConstantState() != null ? icon.getConstantState().newDrawable().mutate() : icon);
-            iv.setImageTintList(ColorStateList.valueOf(TEXT));
-            b.addView(iv, new LinearLayout.LayoutParams(dp(32), dp(32)));
+            iv.setImageDrawable(icon);
+            iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            b.addView(iv, new LinearLayout.LayoutParams(dp(44), dp(44)));
         }
-        TextView t = label(ctx, title, 13, TEXT, true);
-        t.setGravity(Gravity.CENTER);
-        t.setMaxLines(2);
-        t.setEllipsize(TextUtils.TruncateAt.END);
-        t.setPadding(0, dp(6), 0, 0);
-        b.addView(t);
+        N64Theme.OutlineTextView t = new N64Theme.OutlineTextView(ctx, 3.2f, N64Theme.INK);
+        t.setText(title.toString().toUpperCase(java.util.Locale.US));
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        t.setTextColor(Color.WHITE);
+        t.setPadding(0, dp(4), 0, 0);
+        b.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return b;
     }
 
-    private View fab(Context ctx, Drawable icon, String description, View.OnClickListener click)
+    /** The menu's icon in white with a dark outline. */
+    private Drawable outlined(Context ctx, Drawable icon)
+    {
+        return N64Theme.outlinedIcon(ctx, icon, dp(40));
+    }
+
+    /** Cream paper with a dark outline (popups, search bar). */
+    private GradientDrawable paper(int radius)
+    {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(N64Theme.PAPER[0]);
+        g.setCornerRadius(radius);
+        g.setStroke(dp(2), N64Theme.INK);
+        return g;
+    }
+
+    private View fab(Context ctx, Drawable icon, int[] colors, String description, View.OnClickListener click)
     {
         ImageView f = new ImageView(ctx);
-        f.setImageDrawable(icon);
-        f.setImageTintList(ColorStateList.valueOf(Color.WHITE));
+        f.setImageDrawable(N64Theme.outlinedIcon(ctx, icon, dp(28)));
         f.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        f.setPadding(dp(15), dp(15), dp(15), dp(15));
-        StateListDrawable bg = new StateListDrawable();
-        bg.addState(new int[]{android.R.attr.state_pressed}, oval(FOCUS));
-        bg.addState(new int[]{android.R.attr.state_focused}, oval(FOCUS));
-        bg.addState(new int[]{}, oval(ACCENT));
-        f.setBackground(bg);
-        f.setElevation(dp(5));
+        f.setPadding(dp(8), dp(4), dp(8), dp(12));
+        f.setBackground(new N64Theme.OrbDrawable(colors, mDp));
         f.setContentDescription(description);
         f.setFocusable(true);
         f.setClickable(true);
@@ -279,9 +296,10 @@ public class GalleryHomePanel extends FrameLayout
 
     private View popupRow(Context ctx, MenuItem item)
     {
-        TextView t = label(ctx, item.getTitle(), 16, TEXT, false);
-        t.setPadding(dp(16), dp(12), dp(16), dp(12));
-        t.setBackground(buttonBackground(dp(10)));
+        TextView t = label(ctx, item.getTitle(), 16, TEXT, true);
+        N64Theme.ChunkyDrawable bg = new N64Theme.ChunkyDrawable(N64Theme.PAPER, mDp, 12);
+        t.setBackground(bg);
+        t.setPadding(dp(18), dp(14), dp(18), dp(12) + bg.depth());
         t.setFocusable(true);
         t.setClickable(true);
         t.setOnClickListener(v -> {
@@ -334,9 +352,14 @@ public class GalleryHomePanel extends FrameLayout
         mPopupList.removeAllViews();
         mShowingExpansions = true;
 
-        TextView importRow = label(ctx, ctx.getString(R.string.expansions_import), 16, TEXT, true);
-        importRow.setPadding(dp(16), dp(14), dp(16), dp(14));
-        importRow.setBackground(buttonBackground(dp(10)));
+        N64Theme.OutlineTextView importRow = new N64Theme.OutlineTextView(ctx, 3f, N64Theme.INK);
+        importRow.setCentered(false);
+        importRow.setText(ctx.getString(R.string.expansions_import));
+        importRow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        importRow.setTextColor(Color.WHITE);
+        N64Theme.ChunkyDrawable importBg = new N64Theme.ChunkyDrawable(N64Theme.GREEN, mDp, 12);
+        importRow.setBackground(importBg);
+        importRow.setPadding(dp(18), dp(14), dp(18), dp(12) + importBg.depth());
         importRow.setFocusable(true);
         importRow.setClickable(true);
         importRow.setOnClickListener(v -> {
@@ -356,16 +379,20 @@ public class GalleryHomePanel extends FrameLayout
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(16), dp(8), dp(8), dp(8));
-            row.setBackground(rounded(0x33FFFFFF, dp(10), 0));
+            row.setBackground(rounded(0xFFF1E6C8, dp(12), N64Theme.INK));
             LinearLayout text = new LinearLayout(ctx);
             text.setOrientation(LinearLayout.VERTICAL);
             text.addView(label(ctx, e.name, 16, TEXT, true));
             text.addView(label(ctx, ctx.getString(R.string.expansions_for, e.game, e.version)
                     + (e.author.isEmpty() ? "" : " · " + e.author), 12, MUTED, false));
             row.addView(text, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            TextView remove = label(ctx, ctx.getString(R.string.expansions_remove), 14, 0xFFFF8A80, true);
-            remove.setPadding(dp(12), dp(10), dp(12), dp(10));
-            remove.setBackground(buttonBackground(dp(10)));
+            N64Theme.OutlineTextView remove = new N64Theme.OutlineTextView(ctx, 2.6f, N64Theme.INK);
+            remove.setText(ctx.getString(R.string.expansions_remove));
+            remove.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            remove.setTextColor(Color.WHITE);
+            N64Theme.ChunkyDrawable removeBg = new N64Theme.ChunkyDrawable(N64Theme.RED, mDp, 10);
+            remove.setBackground(removeBg);
+            remove.setPadding(dp(14), dp(10), dp(14), dp(8) + removeBg.depth());
             remove.setFocusable(true);
             remove.setClickable(true);
             remove.setOnClickListener(v -> {
@@ -447,7 +474,7 @@ public class GalleryHomePanel extends FrameLayout
         t.setText(text);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTextColor(color);
-        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setTypeface(bold ? N64Theme.font(ctx) : Typeface.DEFAULT);
         return t;
     }
 
@@ -456,7 +483,7 @@ public class GalleryHomePanel extends FrameLayout
         GradientDrawable g = new GradientDrawable();
         g.setColor(color);
         g.setCornerRadius(radius);
-        if (stroke != 0) g.setStroke(dp(1.5f), stroke);
+        if (stroke != 0) g.setStroke(dp(2), stroke);
         return g;
     }
 

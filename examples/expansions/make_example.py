@@ -62,7 +62,7 @@ for axis, off in (("x", "0"), ("y", "4"), ("z", "8")):
 manifest = {
     "format": 1,
     "id": "banjotooie-usa-exemplo",
-    "name": "Banjo-Tooie – Exemplo",
+    "name": "Banjo-Tooie – Example",
     "game": "Banjo-Tooie (USA)",
     "version": "1.0",
     "author": "M64-DS",
@@ -82,11 +82,11 @@ manifest = {
         "columns": 3,
         "tiles": [
             {"label": "Jiggies", "icon": "icons/jiggy.png", "value": "{jiggies}/90"},
-            {"label": "Notas", "icon": "icons/note.png", "value": "{notes}/900"},
-            {"label": "Golpes", "icon": "icons/moves.png", "value": "{moves}/24"},
-            {"label": "Favos", "icon": "icons/honeycomb.png", "value": "{honeycombs}"},
-            {"label": "Páginas Cheato", "icon": "icons/page.png", "value": "{pages}"},
-            {"label": "Tempo", "icon": "icons/clock.png", "value": "{time}"},
+            {"label": "Notes", "icon": "icons/note.png", "value": "{notes}/900"},
+            {"label": "Moves", "icon": "icons/moves.png", "value": "{moves}/24"},
+            {"label": "Honeycombs", "icon": "icons/honeycomb.png", "value": "{honeycombs}"},
+            {"label": "Cheato Pages", "icon": "icons/page.png", "value": "{pages}"},
+            {"label": "Time", "icon": "icons/clock.png", "value": "{time}"},
         ],
         "bar": {"label": "", "items": [
             {"icon": "icons/feather_red.png", "value": "{red_feathers}"},
@@ -121,11 +121,11 @@ manifest = {
             {"x": 1315, "y": 752, "r": 100, "icon": "icons/egg_blue.png", "value": "{blue_eggs}"}
         ],
         "tabs": [
-            {"x": 10, "y": 925, "w": 262, "h": 150, "label": "Painel", "action": "screen:main"},
-            {"x": 280, "y": 925, "w": 282, "h": 150, "label": "Mapa", "action": "screen:map"},
-            {"x": 573, "y": 925, "w": 284, "h": 150, "label": "Golpes", "action": "screen:main"},
-            {"x": 862, "y": 925, "w": 282, "h": 150, "label": "Opções", "action": "menu"},
-            {"x": 1150, "y": 925, "w": 275, "h": 150, "label": "Salvar e sair", "action": "save_quit"}
+            {"x": 10, "y": 925, "w": 262, "h": 150, "label": "Panel", "action": "screen:main"},
+            {"x": 280, "y": 925, "w": 282, "h": 150, "label": "Map", "action": "screen:map"},
+            {"x": 573, "y": 925, "w": 284, "h": 150, "label": "Moves", "action": "screen:main"},
+            {"x": 862, "y": 925, "w": 282, "h": 150, "label": "Options", "action": "menu"},
+            {"x": 1150, "y": 925, "w": 275, "h": 150, "label": "Save and Quit", "action": "save_quit"}
         ]
     },
     "values": values,
