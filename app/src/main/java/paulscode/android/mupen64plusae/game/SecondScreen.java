@@ -77,8 +77,12 @@ public final class SecondScreen
 
     private static boolean isMenuTask(ActivityManager.RecentTaskInfo info)
     {
-        return info.baseActivity != null &&
-                info.baseActivity.getClassName().startsWith(SecondScreenMenuActivity.class.getName());
+        if (info.baseActivity == null) return false;
+        // Both the in-game screen and the app menus' screen (SecondScreenAppMenuActivity, whose
+        // name does NOT start with SecondScreenMenuActivity's)
+        String name = info.baseActivity.getClassName();
+        return name.equals(SecondScreenMenuActivity.class.getName()) ||
+                name.equals(SecondScreenAppMenuActivity.class.getName());
     }
 
     /**

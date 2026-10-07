@@ -47,7 +47,14 @@ shots app_start
 tapb() { adb shell input -d "$SECOND" tap "$1" "$2"; sleep "${3:-4}"; }
 if [ -n "$SECOND" ]; then
   tapb 191 272 5; shots bc_settings_button
-  for y in 260 380 500; do tapb 540 $y 8; shots "bc_popup_tap_$y"; adb shell input -d "$SECOND" keyevent KEYCODE_BACK; sleep 3; tapb 191 272 4; done
+  for y in 260 380 500; do
+    tapb 540 $y 8; shots "bc_popup_tap_$y"
+    tapb 540 420 5; shots "bc_page_${y}_option1"
+    tapb 540 700 5; shots "bc_page_${y}_option2"
+    adb shell input -d "$SECOND" keyevent KEYCODE_BACK; sleep 3
+    adb shell input -d "$SECOND" keyevent KEYCODE_BACK; sleep 3
+    tapb 191 272 4
+  done
   adb shell input -d "$SECOND" keyevent KEYCODE_BACK; sleep 3
   tapb 540 272 5; shots bc_profiles_button
   tapb 540 380 8; shots bc_profiles_row
