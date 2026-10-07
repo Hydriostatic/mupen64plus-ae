@@ -533,10 +533,6 @@ def space_bg():
     sw = SWIRL.resize((96, 96), Image.BILINEAR)                       # galaxy swirl, lilac
     g = Image.new('RGBA', sw.size, (176, 168, 240, 0)); g.putalpha(sw.point(lambda v: int(v * .75)))
     T.alpha_composite(g, (-IX + 168, -IY - 20))
-    ox, oy = -IX, -IY
-    T.alpha_composite(level_word, (ox + 40, oy + 20))
-    d.line((ox + 36, oy + 41, ox + 212, oy + 41), fill=(30, 30, 60, 255), width=1)
-    d.line((ox + 36, oy + 40, ox + 212, oy + 40), fill=(255, 255, 255, 255), width=1)
     return T
 SH_2X, SH_2X_DIM = SHARD_ON.resize((14, 20), Image.NEAREST), crystal_hole(SHARD_ON.resize((14, 20), Image.NEAREST), .6)
 WS_CX = [49, 99, 149, 199]; WS_Y = 104
@@ -566,16 +562,8 @@ for s in range(4):
         values["wsk_%d_%d" % (s, j)] = {"type": "select", "index": "ws_has4" if s == 3 else "ws_real",
                                         "options": ["zero", "ws_%d_%d" % (s, j)]}
         gate("wsg_%d_%d" % (s, j), "wsk_%d_%d" % (s, j), "is_wsel")
-WL = [{"image": "images/ws_bg.png", "x": IX, "y": IY, "show": "is_wsel"},
-      {"pick": "ss_world_no", "show": "is_wsel", "x": 82, "y": 21, "images": {str(n): "images/level_%d.png" % n for n in range(1, 8)}},
-      {"pick": "ss_world", "show": "is_wsel", "anchor": "center", "x": 150, "y": 58, "images": {str(w): "images/world_%d.png" % w for w in range(7)}},
-      {"image": "images/ws_dim3.png", "x": 0, "y": 0, "show": "wsg_n3"},
-      {"image": "images/ws_dim4.png", "x": 0, "y": 0, "show": "wsg_n4"},
-      {"pick": "ss_world", "show": "is_wsel", "anchor": "center", "x": 110, "y": 160, "images": {str(w): "images/boss_%d.png" % w for w in range(7)}},
-      {"image": "icons/shard_2x.png", "x": 160, "y": 150, "show": "wsg_boss"}]
-for s in range(4):
-    for j in range(3):
-        WL.append({"image": "icons/shard_2x.png", "x": WS_CX[s] - 21 + j * 14, "y": WS_Y, "show": "wsg_%d_%d" % (s, j)})
+# only the background: the top screen already shows the level and world
+WL = [{"image": "images/ws_bg.png", "x": IX, "y": IY, "show": "is_wsel"}]
 ML += WL
 
 idx = next(i for i, l in enumerate(L) if l.get("image") == "images/intro_files.png")
