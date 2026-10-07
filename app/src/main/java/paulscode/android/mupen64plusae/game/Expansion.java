@@ -74,6 +74,64 @@ public final class Expansion
     private final Map<String, JSONObject> mValues = new HashMap<>();
     /** Optional second page: a template picture with slots, tabs and a moving map. */
     final MapScreen mapScreen;
+    /** Optional pixel-art page: sprites placed on a small canvas, scaled up without smoothing. */
+    final PixelScreen pixelScreen;
+
+    /**
+     * One sprite layer on the pixel page. Kinds: "image" (fixed), "repeat" (an image drawn
+     * {count} times), "pick" (the image chosen by a value) and "number" (a value drawn with
+     * one image per character). Any layer can be shown/hidden by a value (non-zero = true).
+     */
+    static final class Layer
+    {
+        final String kind, image, value, glyphs, align, show, hide;
+        final int x, y, dx, dy, max, pad, advance;
+        final boolean center;
+        final Map<String, String> images = new HashMap<>();
+        Layer(JSONObject o) throws JSONException
+        {
+            if (o.has("repeat")) { kind = "repeat"; image = o.getString("repeat"); value = o.optString("count", ""); }
+            else if (o.has("pick")) { kind = "pick"; image = null; value = o.getString("pick"); }
+            else if (o.has("number")) { kind = "number"; image = null; value = o.getString("number"); }
+            else { kind = "image"; image = o.getString("image"); value = ""; }
+            x = o.optInt("x", 0); y = o.optInt("y", 0);
+            dx = o.optInt("dx", 0); dy = o.optInt("dy", 0);
+            max = o.optInt("max", 99);
+            glyphs = o.optString("glyphs", "");
+            pad = o.optInt("pad", 0);
+            advance = o.optInt("advance", 0);
+            align = o.optString("align", "left");
+            center = "center".equals(o.optString("anchor", ""));
+            show = o.optString("show", "");
+            hide = o.optString("hide", "");
+            JSONObject imgs = o.optJSONObject("images");
+            if (imgs != null) {
+                for (Iterator<String> it = imgs.keys(); it.hasNext(); ) {
+                    String k = it.next();
+                    images.put(k, imgs.getString(k));
+                }
+            }
+        }
+    }
+
+    static final class PixelScreen
+    {
+        final int width, height, fill;
+        final List<Layer> layers = new ArrayList<>();
+        /** Tap areas in canvas pixels (same actions as map tabs); draw their art as layers. */
+        final List<Tab> buttons = new ArrayList<>();
+        PixelScreen(JSONObject o, int defaultFill) throws JSONException
+        {
+            JSONArray size = o.getJSONArray("size");
+            width = Math.max(1, size.getInt(0));
+            height = Math.max(1, size.getInt(1));
+            fill = color(o.optString("fill"), defaultFill);
+            JSONArray ls = o.optJSONArray("layers");
+            for (int i = 0; ls != null && i < ls.length(); i++) layers.add(new Layer(ls.getJSONObject(i)));
+            JSONArray bs = o.optJSONArray("buttons");
+            for (int i = 0; bs != null && i < bs.length(); i++) buttons.add(new Tab(bs.getJSONObject(i)));
+        }
+    }
 
     /** A spot on the template: a circle with an icon and a value. Template pixels. */
     static final class Slot
@@ -289,6 +347,8 @@ public final class Expansion
 
         JSONObject ms = m.optJSONObject("map_screen");
         mapScreen = ms != null ? new MapScreen(ms, background) : null;
+        JSONObject ps = m.optJSONObject("pixel_screen");
+        pixelScreen = ps != null ? new PixelScreen(ps, background) : null;
 
         JSONObject values = m.optJSONObject("values");
         if (values != null) {
