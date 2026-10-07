@@ -39,7 +39,12 @@ jobs:
     - name: Build APK
       run: |
         chmod +x gradlew
-        ./gradlew assembleRelease --no-daemon
+        set -o pipefail
+        if ! ./gradlew assembleRelease --no-daemon 2>&1 | tee build.log; then
+          # Show the errors as annotations (readable without downloading the log)
+          grep -E "error:|ERROR|FAILED|What went wrong|AAPT|not found|Exception" build.log | head -40 | while IFS= read -r line; do echo "::error::$line"; done
+          exit 1
+        fi
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
