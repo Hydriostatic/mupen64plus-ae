@@ -35,7 +35,6 @@ adb shell input -d "$SECOND" tap 540 900; sleep 6; shots after_bottom_tap
 adb shell input tap 960 540; sleep 6; shots after_top_tap
 # Exit from the in-game menu on the bottom screen (first row)
 adb shell input -d "$SECOND" tap 300 150; sleep 6; shots exit_tapped
-adb shell input -d "$SECOND" tap 300 150; sleep 6; shots exit_tapped_again
-adb shell input keyevent KEYCODE_DPAD_RIGHT; adb shell input keyevent KEYCODE_ENTER; sleep 10; shots exit_confirm_key
-sleep 10; shots after_exit
+adb shell input tap 1425 672; sleep 10; shots exit_ok
+sleep 15; shots after_exit
 exit 0
