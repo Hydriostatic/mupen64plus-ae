@@ -224,6 +224,10 @@ values = {
     "is_logo": {"type": "lookup", "value": "scene", "default": 0, "table": {"1": 1}},
     "is_title": {"type": "lookup", "value": "scene", "default": 0, "table": {"3": 1, "5": 1, "7": 1, "9": 1}},
     "is_files": {"type": "lookup", "value": "scene", "default": 0, "table": {"10": 1}},
+    # 0 = power-on, 2 = between logos and title, 11 = world select (no panel yet): black
+    "is_blank": {"type": "lookup", "value": "scene", "default": 0, "table": {"0": 1, "2": 1}},
+    "is_play": {"type": "lookup", "value": "scene", "default": 1,
+                "table": {str(s): 0 for s in (0, 1, 2, 3, 5, 7, 9, 10, 11, 12)}},
     "fade_obj": {"type": "u32", "addr": "0x800D6B24"},
     "fade_on": {"type": "lookup", "value": "fade_obj", "default": 1, "table": {"0": 0}},
     "fade_alpha": {"type": "s16", "addr": "0x800D6B2E"},
@@ -245,7 +249,7 @@ for k in range(4):
 # ---------------------------------------------------------------------------------------------
 # Layers (canvas pixels)
 # ---------------------------------------------------------------------------------------------
-L = [{"image": "images/bg.png", "x": 0, "y": 0}]
+L = [{"image": "images/bg.png", "x": 0, "y": 0, "show": "is_play"}]
 L.append({"number": "lives", "glyphs": "digits/{c}.png", "pad": 2, "advance": 20, "x": X0 + 22, "y": Y_HUD + 8})
 L.append({"repeat": "images/cell.png", "count": "hp", "max": 6, "dx": 20, "x": X0 + 80, "y": Y_HUD + 2})
 L.append({"repeat": "images/star.png", "count": "stars", "max": 30, "dx": 4, "x": X0 + 80, "y": Y_HUD + 32})
@@ -260,6 +264,7 @@ for k in range(4):
     for j, (sx, sy) in enumerate(SHARD_POS):
         L.append({"image": "icons/shard.png", "x": bx + sx, "y": Y_ABIL + 1 + sy, "show": "s%d_%d" % (k, j), "hide": "is_dark"})
 L.append({"number": "shards", "glyphs": "digits/{c}.png", "advance": 20, "align": "right", "x": TOT_SLASH_X - 2, "y": Y_TOTAL + 9})
+L.append({"image": "images/black.png", "x": IX, "y": IY, "show": "is_blank"})
 L.append({"image": "images/intro_white.png", "x": IX, "y": IY, "show": "is_logo"})
 L.append({"image": "images/intro_title.png", "x": IX, "y": IY, "show": "is_title"})
 L.append({"image": "images/intro_files.png", "x": IX, "y": IY, "show": "is_files"})
@@ -366,19 +371,61 @@ def note_template(k, filled):
     return T
 
 # Stage select background: the HUD's wood stripes, the world strip and a white box for crystals
+# Stage select: a page of the game's sketchbook (the 3D notebook of the stage select), rebuilt
+# flat from its own textures: grass (bank 3 tex 0x207), cardboard (0x21A), paper (0x20A), page
+# stack edge (0x217). The crystals sit on the green paper strip the game uses, as purple outlines
+# for missing ones (like the game) and the blue crystal for collected ones.
+def raw_ci4(index):
+    """A raw 4-bit texture of bank 3 followed by its 16-colour palette (stage select textures)."""
+    h = struct.unpack('>8I', rom[v2r(BANKS[3]):v2r(BANKS[3]) + 32])
+    tb = v2r(h[2])
+    a, pa = h[3] + u32(tb + 4 * index), h[3] + u32(tb + 4 * (index + 1))
+    sz = pa - a
+    pal = [rgba16(struct.unpack('>H', rom[pa + 2 * i:pa + 2 * i + 2])[0]) for i in range(16)]
+    w = {0x80: 16, 0x100: 32, 0x200: 32, 0x400: 64, 0x800: 64}[sz]
+    px = []
+    for b in rom[a:a + sz]: px += [pal[b >> 4], pal[b & 15]]
+    im = Image.new('RGBA', (w, sz * 2 // w)); im.putdata(px); return im
+TEX_GRASS, TEX_PAPER, TEX_EDGE, TEX_CARD = raw_ci4(0x207), raw_ci4(0x20A), raw_ci4(0x217), raw_ci4(0x21A)
+def tile(T, tex, box):
+    x0, y0, x1, y1 = box
+    for y in range(y0, y1, tex.height):
+        for x in range(x0, x1, tex.width):
+            T.paste(tex.crop((0, 0, min(tex.width, x1 - x), min(tex.height, y1 - y))), (x, y))
+def outline_of(im, rgb, th=1):
+    a = im.getchannel('A'); out = Image.new('RGBA', im.size)
+    for y in range(im.height):
+        for x in range(im.width):
+            if not a.getpixel((x, y)): continue
+            edge = any(not (0 <= x + dx < im.width and 0 <= y + dy < im.height and a.getpixel((x + dx, y + dy)))
+                       for dx in range(-th, th + 1) for dy in range(-th, th + 1))
+            if edge: out.putpixel((x, y), rgb + (255,))
+    return out
+SH_BIG_HOLE = outline_of(SH_BIG, (96, 70, 210), 2)              # purple outline, like the game's strip
+STRIP = (150, 214, 158, 255); STRIP_DARK = (104, 170, 112, 255)
 def stage_select_bg(boss):
     T = Image.new('RGBA', (IW, IH))
-    st = frame.crop((12, 2, 13, 24)).resize((IW, 22), Image.NEAREST)
-    for y in range(0, IH, 22): T.paste(st, (0, y))
-    d = ImageDraw.Draw(T)
+    tile(T, TEX_GRASS, (0, 0, IW, IH))
     ox, oy = -IX, -IY
-    rounded(d, ox + X0, oy + 20, 206, 26, DARK)
-    T.alpha_composite(level_word, (ox + X0 + 132, oy + 26))
-    rounded(d, ox + X0, oy + 56, 206, 48, DARK)                      # plate / boss name strip
-    rounded(d, ox + 50, oy + 116, 148, 52, EDGE)
-    rounded(d, ox + 51, oy + 117, 146, 50, (255, 255, 255, 255))
+    tile(T, TEX_CARD, (ox + 12, oy + 10, ox + 240, oy + 196))                  # cardboard back
+    for k, (dx, dy) in enumerate(((5, 6), (2, 3))):                            # page stack
+        tile(T, TEX_EDGE, (ox + 8 + dx, oy + 14 + dy, ox + 234 + dx, oy + 192 + dy))
+    page = Image.new('RGBA', (226, 178)); tile(page, TEX_PAPER, (0, 0, 226, 178))
+    for x in range(0, 226, 12):                                                # torn top edge
+        for y in range(0, 4 if (x // 12) % 2 else 2):
+            for xx in range(x, min(x + 12, 226)): page.putpixel((xx, y), (0, 0, 0, 0))
+    T.alpha_composite(page, (ox + 8, oy + 14))
+    d = ImageDraw.Draw(T)
+    for x in range(ox + 22, ox + 228, 18):                                     # spiral: hole + red wire
+        d.ellipse((x, oy + 19, x + 5, oy + 22), fill=(150, 150, 150, 255))
+        d.arc((x - 1, oy + 9, x + 6, oy + 22), 180, 360, fill=(220, 40, 30, 255), width=2)
+    T.alpha_composite(level_word, (ox + X0 + 132, oy + 32))
+    if boss:                                                                   # strip behind the boss name
+        rounded(d, ox + 80, oy + 70, 88, 21, (60, 120, 70, 255))
+    rounded(d, ox + 44, oy + 114, 160, 50, STRIP_DARK)                          # green strip
+    rounded(d, ox + 45, oy + 115, 158, 48, STRIP)
     for x in ([SS_SH_X[1]] if boss else SS_SH_X):
-        T.alpha_composite(SH_BIG_DIM, (ox + x, oy + 127))
+        T.alpha_composite(SH_BIG_HOLE, (ox + x, oy + 125))
     return T
 SS_SH_X = [70, 110, 150]
 
@@ -450,15 +497,86 @@ for w in range(6):
 # stage select
 ML.append({"image": "images/ss_bg.png", "x": IX, "y": IY, "show": "ssg_normal"})
 ML.append({"image": "images/ss_bg_boss.png", "x": IX, "y": IY, "show": "ssg_boss"})
-ML.append({"pick": "ss_world", "show": "is_ssel", "x": X0 + 8, "y": 23, "images": {str(w): "images/world_%d.png" % w for w in range(7)}})
-ML.append({"pick": "ss_world_no", "show": "is_ssel", "x": X0 + 178, "y": 26, "images": {str(n): "images/level_%d.png" % n for n in range(1, 8)}})
+ML.append({"pick": "ss_world", "show": "is_ssel", "x": X0 + 8, "y": 29, "images": {str(w): "images/world_%d.png" % w for w in range(7)}})
+ML.append({"pick": "ss_world_no", "show": "is_ssel", "x": X0 + 178, "y": 32, "images": {str(n): "images/level_%d.png" % n for n in range(1, 8)}})
 ML.append({"pick": "ss_stage", "show": "ssg_normal", "anchor": "center", "x": 124, "y": 80,
            "images": {str(k): "images/stage_plate_%d.png" % k for k in range(4)}})
 ML.append({"pick": "ss_world", "show": "ssg_boss", "anchor": "center", "x": 124, "y": 80,
            "images": {str(w): "images/boss_%d.png" % w for w in range(7)}})
 for j in range(3):
-    ML.append({"image": "icons/shard_big.png", "x": SS_SH_X[j], "y": 127, "show": "ssg_sh%d" % j})
-ML.append({"image": "icons/shard_big.png", "x": SS_SH_X[1], "y": 127, "show": "ssg_boss_got"})
+    ML.append({"image": "icons/shard_big.png", "x": SS_SH_X[j], "y": 125, "show": "ssg_sh%d" % j})
+ML.append({"image": "icons/shard_big.png", "x": SS_SH_X[1], "y": 125, "show": "ssg_boss_got"})
+
+# ---------------------------------------------------------------------------------------------
+# World select (state 11): the blue space of that screen, from its own textures (bank 3 i4
+# textures the game tints: star field 0xA9B268, galaxy swirl 0xA9AC68), with 'Level N', the
+# world name, and the selected world's crystals per stage + its boss, from the loaded save.
+# ---------------------------------------------------------------------------------------------
+def i4_tex(off, w, h):
+    px = []
+    for b in rom[off:off + w * h // 2]: px += [b >> 4, b & 15]
+    im = Image.new('L', (w, h)); im.putdata([v * 17 for v in px[:w * h]]); return im
+STARFIELD, SWIRL = i4_tex(0xA9B268, 64, 64), i4_tex(0xA9AC68, 32, 32)
+def space_bg():
+    T = Image.new('RGBA', (IW, IH)); d = ImageDraw.Draw(T)
+    for y in range(IH):                                               # deep blue, lighter below
+        k = y / IH; d.line((0, y, IW, y), fill=(int(12 + 18 * k), int(24 + 40 * k), int(120 + 60 * k), 255))
+    rnd = random.Random(7)
+    for ty in range(0, IH, 64):                                       # the game's star field, tinted
+        for tx in range(0, IW, 64):
+            for y in range(64):
+                for x in range(64):
+                    v = STARFIELD.getpixel((x, y))
+                    if v > 40 and 0 <= tx + x < IW and 0 <= ty + y < IH:
+                        c = (250, 214, 90) if (x * 7 + y * 13 + tx) % 3 == 0 else (255, 255, 240)
+                        T.putpixel((tx + x, ty + y), c + (255,))
+    sw = SWIRL.resize((96, 96), Image.BILINEAR)                       # galaxy swirl, lilac
+    g = Image.new('RGBA', sw.size, (176, 168, 240, 0)); g.putalpha(sw.point(lambda v: int(v * .75)))
+    T.alpha_composite(g, (-IX + 168, -IY - 20))
+    ox, oy = -IX, -IY
+    T.alpha_composite(level_word, (ox + 40, oy + 20))
+    d.line((ox + 36, oy + 41, ox + 212, oy + 41), fill=(30, 30, 60, 255), width=1)
+    d.line((ox + 36, oy + 40, ox + 212, oy + 40), fill=(255, 255, 255, 255), width=1)
+    return T
+SH_2X, SH_2X_DIM = SHARD_ON.resize((14, 20), Image.NEAREST), crystal_hole(SHARD_ON.resize((14, 20), Image.NEAREST), .6)
+WS_CX = [49, 99, 149, 199]; WS_Y = 104
+def ws_dims(n):
+    T = Image.new('RGBA', (GW, GH))
+    for s in range(n):
+        T.alpha_composite(small[s + 1], (WS_CX[s] - 5, WS_Y - 18))
+        for j in range(3): T.alpha_composite(SH_2X_DIM, (WS_CX[s] - 21 + j * 14, WS_Y))
+    d = ImageDraw.Draw(T)
+    rounded(d, 70, 150, 80, 20, (20, 30, 90, 255))
+    T.alpha_composite(SH_2X_DIM, (160, 150))
+    return T
+files_extra.update({"images/ws_bg.png": space_bg(), "images/ws_dim3.png": ws_dims(3),
+                    "images/ws_dim4.png": ws_dims(4), "icons/shard_2x.png": SH_2X})
+values.update({
+    "is_wsel": {"type": "lookup", "value": "scene", "default": 0, "table": {"11": 1}},
+    "ws_n3": {"type": "lookup", "value": "ss_world", "default": 0, "table": {"0": 1, "5": 1}},
+    "ws_n4": {"type": "lookup", "value": "ss_world", "default": 0, "table": {"1": 1, "2": 1, "3": 1, "4": 1}},
+    "ws_has4": {"type": "lookup", "value": "ss_world", "default": 1, "table": {"0": 0, "5": 0, "6": 0}},
+    "ws_real": {"type": "lookup", "value": "ss_world", "default": 1, "table": {"6": 0}},
+})
+gate("wsg_n3", "ws_n3", "is_wsel"); gate("wsg_n4", "ws_n4", "is_wsel"); gate("wsg_boss", "ss_bossflag", "is_wsel")
+for s in range(4):
+    for j in range(3):
+        values["ws_%d_%d" % (s, j)] = {"type": "flags", "mode": "any", "bits": [j],
+                                       "chain": ["0x800D6BC8", {"value": "ss_world", "times": 4}, str(s)]}
+        values["wsk_%d_%d" % (s, j)] = {"type": "select", "index": "ws_has4" if s == 3 else "ws_real",
+                                        "options": ["zero", "ws_%d_%d" % (s, j)]}
+        gate("wsg_%d_%d" % (s, j), "wsk_%d_%d" % (s, j), "is_wsel")
+WL = [{"image": "images/ws_bg.png", "x": IX, "y": IY, "show": "is_wsel"},
+      {"pick": "ss_world_no", "show": "is_wsel", "x": 82, "y": 21, "images": {str(n): "images/level_%d.png" % n for n in range(1, 8)}},
+      {"pick": "ss_world", "show": "is_wsel", "anchor": "center", "x": 150, "y": 58, "images": {str(w): "images/world_%d.png" % w for w in range(7)}},
+      {"image": "images/ws_dim3.png", "x": 0, "y": 0, "show": "wsg_n3"},
+      {"image": "images/ws_dim4.png", "x": 0, "y": 0, "show": "wsg_n4"},
+      {"pick": "ss_world", "show": "is_wsel", "anchor": "center", "x": 110, "y": 160, "images": {str(w): "images/boss_%d.png" % w for w in range(7)}},
+      {"image": "icons/shard_2x.png", "x": 160, "y": 150, "show": "wsg_boss"}]
+for s in range(4):
+    for j in range(3):
+        WL.append({"image": "icons/shard_2x.png", "x": WS_CX[s] - 21 + j * 14, "y": WS_Y, "show": "wsg_%d_%d" % (s, j)})
+ML += WL
 
 idx = next(i for i, l in enumerate(L) if l.get("image") == "images/intro_files.png")
 L[idx + 1:idx + 1] = ML
@@ -474,11 +592,12 @@ manifest = {
     "match": {"header": "KIRBY64", "country": "E"},
     "theme": {"background": "#9C7318"},
     "screen": {"title": "Kirby 64"},
-    "pixel_screen": {"size": [GW, GH], "fill": "#9C7318", "layers": L},
+    "pixel_screen": {"size": [GW, GH], "fill": "#000000", "layers": L},
     "values": values,
 }
 
 files = {
+    "images/black.png": Image.new('RGBA', (IW, IH), (0, 0, 0, 255)),
     **files_extra,
     "images/intro_files.png": intro_files,
     **fade_img,
