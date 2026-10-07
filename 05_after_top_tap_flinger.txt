@@ -1,0 +1,14 @@
+Output thread 0x77b0d5a13930, name AudioOut_D, tid 503, type 0 (MIXER):
+  Standby: no
+  2 Tracks of which 1 are active
+    Type     Id Active Client Session Port Id S  Flags   Format Chn mask  SRate ST Usg CT  G db  L dB  R dB  VS dB   Server FrmCnt  FrmRdy F Underruns  Flushed BitPerfect   Latency
+             56    yes   4988     153      16 A  0x000 00000001 00000003  48000  3   1  2   -33     0     0     0  00454140   4360    4032 A      1536        0      false  174.20 t
+  0 Effect Chains
+Output thread 0x77b0d0533930, name AudioOut_15, tid 505, type 0 (MIXER):
+  Standby: yes
+  0 Tracks
+  0 Effect Chains
+-   Standby: no
+-   Standby: no
+-   Standby: no
+-   Standby: no

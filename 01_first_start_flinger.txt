@@ -1,0 +1,12 @@
+Output thread 0x77b0d5a13930, name AudioOut_D, tid 503, type 0 (MIXER):
+  Standby: yes
+  0 Tracks
+  0 Effect Chains
+Output thread 0x77b0d0533930, name AudioOut_15, tid 505, type 0 (MIXER):
+  Standby: yes
+  0 Tracks
+  0 Effect Chains
+-   Standby: no
+-   Standby: no
+-   Standby: no
+-   Standby: no

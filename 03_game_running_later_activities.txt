@@ -1,0 +1,3 @@
+    topResumedActivity=ActivityRecord{19f5d56 u0 org.mupen64plusae.v3.alpha.thor/paulscode.android.mupen64plusae.game.GameActivity t8}
+    topResumedActivity=ActivityRecord{7209aae u0 org.mupen64plusae.v3.alpha.thor/paulscode.android.mupen64plusae.game.SecondScreenMenuActivity t11}
+  ResumedActivity: ActivityRecord{19f5d56 u0 org.mupen64plusae.v3.alpha.thor/paulscode.android.mupen64plusae.game.GameActivity t8}
