@@ -10,7 +10,7 @@ on:
         required: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   smoke:
@@ -43,6 +43,16 @@ jobs:
         disable-animations: true
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         script: bash .github/smoke/run.sh
+
+    - name: Push results to the smoke-results branch
+      if: always()
+      run: |
+        cd smoke
+        git init -q -b smoke-results
+        git config user.name "smoke-test"
+        git config user.email "smoke@localhost"
+        git add -A && git commit -qm "Smoke test results ${GITHUB_RUN_ID}"
+        git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" smoke-results
 
     - name: Keep results
       if: always()
