@@ -193,7 +193,7 @@ public class SecondScreenMenuActivity extends Activity
         column.addView(mMenuContainer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        // In-game live info (e.g. Banjo-Tooie stats), shown instead of the menu while playing
+        // In-game live info (from an expansion), shown instead of the menu while playing
         mInfoContainer = new FrameLayout(ctx);
         mInfoContainer.setVisibility(View.GONE);
         column.addView(mInfoContainer, new LinearLayout.LayoutParams(

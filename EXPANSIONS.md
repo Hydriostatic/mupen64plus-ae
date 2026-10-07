@@ -158,4 +158,6 @@ O primeiro item é o endereço inicial. Números somam ao endereço, `{"value": 
 `"*"` lê o ponteiro guardado ali.
 
 O exemplo completo está em `examples/expansions/banjotooie.exp`; para ver o manifest, abra o
-arquivo como zip.
+arquivo como zip. Ele é gerado por `make_example.py` (arte em `art/`, tabelas em
+`banjotooie_tables.json`). O emulador não tem nenhum painel de jogo embutido: tudo vem das
+expansões.

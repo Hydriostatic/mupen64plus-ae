@@ -463,12 +463,6 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
             mDrawerLayout.setInfoPanel(new ExpansionView(this, expansion, mDrawerLayout::toggleControllerTarget,
                     this::saveAndQuitFromSecondScreen));
         }
-        // Banjo-Tooie (USA): live stats (health, collectibles, ammo) on the second screen
-        else if (mDrawerLayout.isUsingSecondScreen() &&
-                BanjoTooieStats.isBanjoTooieUsa(mRomHeaderName, mRomCountryCode)) {
-            mDrawerLayout.setInfoPanel(new BanjoTooiePauseView(this, mDrawerLayout::toggleControllerTarget,
-                    this::saveAndQuitFromSecondScreen));
-        }
 
         if (!TextUtils.isEmpty(mRomArtPath) && new File(mRomArtPath).exists() && FileUtil.isFileImage(new File(mRomArtPath)))
             mGameSidebar.setImage(new BitmapDrawable(this.getResources(), mRomArtPath));
@@ -788,7 +782,7 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         }
     }
 
-    /** "Save and Quit" on the Banjo-Tooie screen: save to the current slot, then leave the game. */
+    /** "Save and Quit" on an expansion's screen: save to the current slot, then leave the game. */
     void saveAndQuitFromSecondScreen()
     {
         if (mCoreFragment == null) return;

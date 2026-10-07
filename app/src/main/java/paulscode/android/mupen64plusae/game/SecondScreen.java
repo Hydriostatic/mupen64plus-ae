@@ -43,6 +43,13 @@ public final class SecondScreen
 
     private SecondScreen() {}
 
+    /**
+     * True while a system screen we opened on purpose (the file picker for importing an
+     * expansion) covers the second screen: that isn't the user leaving the app, so both screens
+     * must stay where they are.
+     */
+    public static volatile boolean sSystemPickerOpen = false;
+
     public static boolean isEnabled(@NonNull Context context)
     {
         return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(PREF_KEY, true);

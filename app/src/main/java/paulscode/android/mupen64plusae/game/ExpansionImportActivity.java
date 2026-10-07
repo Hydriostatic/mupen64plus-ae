@@ -48,18 +48,36 @@ public class ExpansionImportActivity extends Activity
         Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         pick.addCategory(Intent.CATEGORY_OPENABLE);
         pick.setType("*/*"); // .exp has no registered MIME type
+        // The picker is another app: while it's open, covering the second screen is expected
+        SecondScreen.sSystemPickerOpen = true;
         try {
-            startActivityForResult(pick, PICK);
+            // Open it on this (the second) screen
+            android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
+            options.setLaunchDisplayId(SecondScreen.displayOf(this));
+            try {
+                startActivityForResult(pick, PICK, options.toBundle());
+            } catch (SecurityException | IllegalArgumentException e) {
+                startActivityForResult(pick, PICK);
+            }
         } catch (ActivityNotFoundException e) {
+            SecondScreen.sSystemPickerOpen = false;
             Toast.makeText(this, R.string.expansions_noPicker, Toast.LENGTH_LONG).show();
             finish();
         }
     }
 
     @Override
+    protected void onDestroy()
+    {
+        if (!isChangingConfigurations()) SecondScreen.sSystemPickerOpen = false;
+        super.onDestroy();
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data)
     {
         super.onActivityResult(requestCode, resultCode, data);
+        SecondScreen.sSystemPickerOpen = false;
         Uri uri = data != null ? data.getData() : null;
         if (requestCode != PICK || resultCode != RESULT_OK || uri == null) {
             finish();

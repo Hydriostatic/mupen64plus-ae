@@ -107,7 +107,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private final ControllerNav mHostNav = new ControllerNav();
     /** Back/Menu down was used to toggle the controller; swallow the matching up. */
     private boolean mSwallowToggleUp = false;
-    /** In-game only: optional live info (e.g. Banjo-Tooie stats) shown instead of the menu. */
+    /** In-game only: optional live info (from an expansion) shown instead of the menu. */
     private View mInfoPanel;
     private DisplayManager mDisplayManager;
 
@@ -127,6 +127,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
     private final Runnable mLeftAppCheck = new Runnable() {
         @Override
         public void run() {
+            if (SecondScreen.sSystemPickerOpen) return;
             if (mHostVisible || mMenuScreen == null) return;
             Boolean appVisible = SecondScreen.isAppVisible(getContext());
             if (appVisible == null) {
@@ -149,6 +150,7 @@ public class DualScreenDrawerLayout extends DrawerLayout
      * game's own second screen) the user pressed Home there: both screens go home together.
      */
     private final Runnable mCoveredCheck = () -> {
+        if (SecondScreen.sSystemPickerOpen) return;
         if (!mHostVisible || mMenuScreen == null || mMenuScreen.isFinishing() || mMenuScreen.isShownToUser()) return;
         Boolean covered = SecondScreen.isMenuCoveredByOtherApp(getContext(), mMenuScreen.getTaskId());
         if (covered != null && covered) {
@@ -197,12 +199,14 @@ public class DualScreenDrawerLayout extends DrawerLayout
      */
     public void onUserLeftApp()
     {
+        if (SecondScreen.sSystemPickerOpen) return;
         if (mSecondScreenActive) leaveApp(false);
     }
 
     /** Home / Recents pressed while the second screen had the focus. */
     void onUserLeftAppFromSecondScreen()
     {
+        if (SecondScreen.sSystemPickerOpen) return;
         if (mSecondScreenActive) leaveApp(true);
     }
 

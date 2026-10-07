@@ -2,22 +2,18 @@
 """Builds the example expansion banjotooie.exp (Banjo-Tooie USA) from the repo's art + tables."""
 import json, re, sys, zipfile, os
 
-REPO = '/root/mupen64plus-ae'
-SRC = REPO + '/app/src/main/java/paulscode/android/mupen64plusae/game/BanjoTooieStats.java'
-ART = REPO + '/app/src/main/res/drawable-nodpi/'
-FONT = REPO + '/app/src/main/assets/fonts/LilitaOne-Regular.ttf'
+HERE = os.path.dirname(os.path.abspath(__file__))
+ART = HERE + '/art/'
+FONT = ART + 'LilitaOne-Regular.ttf'
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'banjotooie.exp'
 
-java = open(SRC).read()
-
-def arr(name):
-    m = re.search(r'static final int\[\] ' + name + r'\s*=\s*\{(.*?)\};', java, re.S)
-    return [int(x, 16) for x in re.findall(r'0x[0-9A-Fa-f]+', m.group(1))]
-
-worlds = re.search(r'static final String\[\] WORLDS = \{(.*?)\};', java, re.S).group(1)
-worlds = re.findall(r'"([^"]*)"', worlds)
-mw = re.search(r'static final int\[\]\[\] MAP_WORLD = \{(.*?)\};', java, re.S).group(1)
-map_world = {int(a, 16): int(b) for a, b in re.findall(r'\{(0x[0-9A-Fa-f]+),\s*(\d+)\}', mw)}
+# Banjo-Tooie (USA) tables: flags are (byte << 3) | bit in the flag block (from the Archipelago
+# Banjo-Tooie connector, MIT)
+TABLES = json.load(open(HERE + '/banjotooie_tables.json'))
+def arr(name): return TABLES[name]
+def arr2(name): return TABLES[name]
+worlds = TABLES['WORLDS']
+map_world = {a: b for a, b in TABLES['MAP_WORLD']}
 
 FLAGS = {"ptr": "0x8012C770", "offset": "0"}
 def cons(i):
@@ -36,10 +32,6 @@ values = {
     "honeycombs": cons(9), "pages": cons(10),
     "blue_eggs": cons(0), "fire_eggs": cons(1), "red_feathers": cons(6), "gold_feathers": cons(7),
 }
-
-def arr2(name):
-    m = re.search(r'static final int\[\]\[\] ' + name + r'\s*=\s*\{(.*?)\};', java, re.S)
-    return [[int(x, 16) for x in re.findall(r'0x[0-9A-Fa-f]+', row)] for row in re.findall(r'\{([^{}]*)\}', m.group(1))]
 
 # --- Values for the map page: this world's collectibles -------------------------------------
 J, NN, TC = arr('JIGGY_FLAGS'), arr('NOTE_NEST_FLAGS'), arr('TREBLE_CLEF_FLAGS')
@@ -150,7 +142,6 @@ files = {
 # Map page art: the user's template (as JPEG), the parchment mask, the Mayahem Temple map
 import numpy as np
 from PIL import Image, ImageFilter
-HERE = os.path.dirname(os.path.abspath(__file__))
 tpl = Image.open(HERE + '/map_template.png').convert('RGB')
 tpl.save('/tmp/_map_template.jpg', quality=92)
 a = np.array(tpl).astype(int); H_, W_ = a.shape[:2]
@@ -170,5 +161,5 @@ with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED) as z:
     z.write(FONT, "fonts/LilitaOne-Regular.ttf")
     for dst, src in EXTRA.items():
         z.write(src, dst)
-    z.write(os.path.dirname(FONT) + "/LilitaOne-OFL.txt", "fonts/OFL.txt")
+    z.write(ART + "LilitaOne-OFL.txt", "fonts/OFL.txt")
 print(OUT, os.path.getsize(OUT), "bytes")

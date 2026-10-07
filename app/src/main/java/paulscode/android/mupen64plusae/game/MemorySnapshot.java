@@ -59,11 +59,11 @@ final class MemorySnapshot
         new Thread(() -> {
             String result;
             try {
-                byte[] all = new byte[BanjoTooieStats.RDRAM_SIZE];
+                byte[] all = new byte[GameMemory.RDRAM_SIZE];
                 final int chunk = 0x10000;
                 byte[] buf = new byte[chunk];
                 for (int off = 0; off < all.length; off += chunk) {
-                    if (!BanjoTooieStats.readRaw(off, buf, chunk)) throw new IllegalStateException("game not running");
+                    if (!GameMemory.read(off, buf, chunk)) throw new IllegalStateException("game not running");
                     System.arraycopy(buf, 0, all, off, chunk);
                 }
                 result = write(app, name, all);

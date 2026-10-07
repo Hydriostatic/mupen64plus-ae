@@ -439,7 +439,7 @@ public final class Expansion
         {
             mCache.clear();
             mBlocks.clear();
-            gameRunning = BanjoTooieStats.readRaw(0, mBuf, 4);
+            gameRunning = GameMemory.read(0, mBuf, 4);
             return gameRunning;
         }
 
@@ -592,7 +592,7 @@ public final class Expansion
                         if (v == null) return null;
                         cur += v * o.optLong("times", 1);
                     } else if ("*".equals(String.valueOf(step))) {
-                        if (!BanjoTooieStats.readRaw((int) cur, mBuf, 4)) return null;
+                        if (!GameMemory.read((int) cur, mBuf, 4)) return null;
                         int ptr = ((mBuf[0] & 0xFF) << 24) | ((mBuf[1] & 0xFF) << 16) | ((mBuf[2] & 0xFF) << 8) | (mBuf[3] & 0xFF);
                         if ((ptr & 0xFF800000) != 0x80000000) return null;
                         cur = ptr & 0x7FFFFF;
@@ -604,7 +604,7 @@ public final class Expansion
             }
             if (d.has("ptr")) {
                 int p = parse(d.getString("ptr"));
-                if (!BanjoTooieStats.readRaw(p, mBuf, 4)) return null;
+                if (!GameMemory.read(p, mBuf, 4)) return null;
                 int ptr = ((mBuf[0] & 0xFF) << 24) | ((mBuf[1] & 0xFF) << 16) | ((mBuf[2] & 0xFF) << 8) | (mBuf[3] & 0xFF);
                 if ((ptr & 0xFF800000) != 0x80000000) return null; // not a valid pointer (yet)
                 return (ptr & 0x7FFFFF) + parse(d.optString("offset", "0"));
@@ -617,7 +617,7 @@ public final class Expansion
             byte[] b = mBlocks.get(addr);
             if (b != null && b.length >= size) return b;
             b = new byte[size];
-            if (!BanjoTooieStats.readRaw(addr, b, size)) return null;
+            if (!GameMemory.read(addr, b, size)) return null;
             mBlocks.put(addr, b);
             return b;
         }
@@ -625,7 +625,7 @@ public final class Expansion
         private long read(int addr, String type)
         {
             int n = type.endsWith("8") ? 1 : type.endsWith("16") ? 2 : 4;
-            if (!BanjoTooieStats.readRaw(addr, mBuf, n)) return 0;
+            if (!GameMemory.read(addr, mBuf, n)) return 0;
             long v = 0;
             for (int i = 0; i < n; i++) v = (v << 8) | (mBuf[i] & 0xFF);
             if ("s8".equals(type)) v = (byte) v;
