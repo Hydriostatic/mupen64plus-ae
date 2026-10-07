@@ -1045,4 +1045,13 @@
     <string name="actionSearchRoms">Search ROMs</string>
 
 
+    <string name="expansions_title">Expansions</string>
+    <string name="expansions_import">Import expansion (.exp)…</string>
+    <string name="expansions_none">No expansions installed. An expansion (.exp) adds a second-screen panel for one game.</string>
+    <string name="expansions_remove">Remove</string>
+    <string name="expansions_for">For: %1$s · v%2$s</string>
+    <string name="expansions_imported">Expansion installed: %1$s</string>
+    <string name="expansions_importFailed">Not a valid expansion: %1$s</string>
+    <string name="expansions_removed">Expansion removed: %1$s</string>
+    <string name="expansions_noPicker">No file picker found on this device.</string>
 </resources>

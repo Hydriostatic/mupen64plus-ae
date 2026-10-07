@@ -400,4 +400,13 @@
     <string name="secondScreenMenu_back">Voltar</string>
     <string name="secondScreenMenu_resume">Voltar ao jogo</string>
     <string name="secondScreenMenu_tapToOpen">Toque para pausar e abrir o menu</string>
+    <string name="expansions_title">Expansões</string>
+    <string name="expansions_import">Importar expansão (.exp)…</string>
+    <string name="expansions_none">Nenhuma expansão instalada. Uma expansão (.exp) adiciona um painel na segunda tela para um jogo.</string>
+    <string name="expansions_remove">Remover</string>
+    <string name="expansions_for">Para: %1$s · v%2$s</string>
+    <string name="expansions_imported">Expansão instalada: %1$s</string>
+    <string name="expansions_importFailed">Expansão inválida: %1$s</string>
+    <string name="expansions_removed">Expansão removida: %1$s</string>
+    <string name="expansions_noPicker">Nenhum seletor de arquivos encontrado.</string>
 </resources>

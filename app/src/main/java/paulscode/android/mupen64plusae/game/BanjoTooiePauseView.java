@@ -131,11 +131,27 @@ public class BanjoTooiePauseView extends View
         super(context);
         mOpenMenu = openMenu;
         mSaveAndQuit = saveAndQuit;
-        Typeface black = Typeface.create("sans-serif-black", Typeface.BOLD);
-        mHeavy = black != null ? black : Typeface.DEFAULT_BOLD;
+        mHeavy = loadFont(context);
         mText.setTypeface(mHeavy);
         for (int i = 0; i < mTabRects.length; i++) mTabRects[i] = new RectF();
         loadArt();
+    }
+
+    /** Lilita One (SIL Open Font License, assets/fonts/LilitaOne-OFL.txt): bold cartoon letters. */
+    private static Typeface sFont;
+
+    private static Typeface loadFont(Context context)
+    {
+        if (sFont == null) {
+            try {
+                sFont = Typeface.createFromAsset(context.getAssets(), "fonts/LilitaOne-Regular.ttf");
+            } catch (Exception e) {
+                Log.w(TAG, "Couldn't load Lilita One", e);
+                Typeface black = Typeface.create("sans-serif-black", Typeface.BOLD);
+                sFont = black != null ? black : Typeface.DEFAULT_BOLD;
+            }
+        }
+        return sFont;
     }
 
     // Wooden pieces cut from the M64-DS template, and the player's icon set

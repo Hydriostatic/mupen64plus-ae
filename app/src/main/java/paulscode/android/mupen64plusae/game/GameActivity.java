@@ -456,8 +456,15 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         // On dual-screen devices (e.g. AYN Thor) show the in-game menu on the second screen
         mDrawerLayout.setSecondScreenEnabled(mGlobalPrefs.inGameMenuOnSecondScreen);
 
+        // Second-screen expansion (.exp) imported for this ROM: its panel goes on the second screen
+        Expansion expansion = mDrawerLayout.isUsingSecondScreen() ?
+                ExpansionManager.findFor(this, mRomHeaderName, mRomCountryCode, mRomCrc, mRomMd5) : null;
+        if (expansion != null) {
+            mDrawerLayout.setInfoPanel(new ExpansionView(this, expansion, mDrawerLayout::toggleControllerTarget,
+                    this::saveAndQuitFromSecondScreen));
+        }
         // Banjo-Tooie (USA): live stats (health, collectibles, ammo) on the second screen
-        if (mDrawerLayout.isUsingSecondScreen() &&
+        else if (mDrawerLayout.isUsingSecondScreen() &&
                 BanjoTooieStats.isBanjoTooieUsa(mRomHeaderName, mRomCountryCode)) {
             mDrawerLayout.setInfoPanel(new BanjoTooiePauseView(this, mDrawerLayout::toggleControllerTarget,
                     this::saveAndQuitFromSecondScreen));

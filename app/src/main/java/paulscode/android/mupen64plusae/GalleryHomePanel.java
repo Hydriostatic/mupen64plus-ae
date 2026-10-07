@@ -17,6 +17,7 @@
 package paulscode.android.mupen64plusae;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -41,6 +42,12 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import paulscode.android.mupen64plusae.game.Expansion;
+import paulscode.android.mupen64plusae.game.ExpansionImportActivity;
+import paulscode.android.mupen64plusae.game.ExpansionManager;
+import paulscode.android.mupen64plusae.game.SecondScreen;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -146,6 +153,8 @@ public class GalleryHomePanel extends FrameLayout
             }
             buttons.add(optionButton(ctx, item.getIcon(), item.getTitle(), v -> onOption(item)));
         }
+        Drawable expIcon = ctx.getDrawable(android.R.drawable.ic_menu_add);
+        buttons.add(optionButton(ctx, expIcon, ctx.getString(R.string.expansions_title), v -> showExpansions()));
         Drawable exitIcon = ctx.getDrawable(android.R.drawable.ic_lock_power_off);
         buttons.add(optionButton(ctx, exitIcon, ctx.getString(R.string.secondScreen_exit), v -> mActivity.exitFromSecondScreen()));
 
@@ -297,6 +306,7 @@ public class GalleryHomePanel extends FrameLayout
 
     private void showPopup(MenuItem group)
     {
+        mShowingExpansions = false;
         Context ctx = getContext();
         mPopupTitle.setText(group.getTitle());
         mPopupList.removeAllViews();
@@ -316,8 +326,74 @@ public class GalleryHomePanel extends FrameLayout
         if (first != null) first.requestFocus();
     }
 
+    /** Expansions popup: installed .exp files (with Remove) and "Import expansion…". */
+    private void showExpansions()
+    {
+        Context ctx = getContext();
+        mPopupTitle.setText(R.string.expansions_title);
+        mPopupList.removeAllViews();
+        mShowingExpansions = true;
+
+        TextView importRow = label(ctx, ctx.getString(R.string.expansions_import), 16, TEXT, true);
+        importRow.setPadding(dp(16), dp(14), dp(16), dp(14));
+        importRow.setBackground(buttonBackground(dp(10)));
+        importRow.setFocusable(true);
+        importRow.setClickable(true);
+        importRow.setOnClickListener(v -> {
+            ExpansionImportActivity.sOnChanged = () -> { if (mShowingExpansions && mPopup.getVisibility() == View.VISIBLE) showExpansions(); };
+            SecondScreen.startActivity(mActivity, new Intent(mActivity, ExpansionImportActivity.class));
+        });
+        mPopupList.addView(importRow, popupLp());
+
+        List<Expansion> installed = ExpansionManager.list(ctx);
+        if (installed.isEmpty()) {
+            TextView none = label(ctx, ctx.getString(R.string.expansions_none), 14, MUTED, false);
+            none.setPadding(dp(16), dp(12), dp(16), dp(8));
+            mPopupList.addView(none, popupLp());
+        }
+        for (Expansion e : installed) {
+            LinearLayout row = new LinearLayout(ctx);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(16), dp(8), dp(8), dp(8));
+            row.setBackground(rounded(0x33FFFFFF, dp(10), 0));
+            LinearLayout text = new LinearLayout(ctx);
+            text.setOrientation(LinearLayout.VERTICAL);
+            text.addView(label(ctx, e.name, 16, TEXT, true));
+            text.addView(label(ctx, ctx.getString(R.string.expansions_for, e.game, e.version)
+                    + (e.author.isEmpty() ? "" : " · " + e.author), 12, MUTED, false));
+            row.addView(text, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            TextView remove = label(ctx, ctx.getString(R.string.expansions_remove), 14, 0xFFFF8A80, true);
+            remove.setPadding(dp(12), dp(10), dp(12), dp(10));
+            remove.setBackground(buttonBackground(dp(10)));
+            remove.setFocusable(true);
+            remove.setClickable(true);
+            remove.setOnClickListener(v -> {
+                if (ExpansionManager.delete(e)) {
+                    Toast.makeText(ctx, ctx.getString(R.string.expansions_removed, e.name), Toast.LENGTH_SHORT).show();
+                }
+                showExpansions();
+            });
+            row.addView(remove);
+            mPopupList.addView(row, popupLp());
+        }
+        mPopup.setVisibility(View.VISIBLE);
+        importRow.requestFocus();
+    }
+
+    private boolean mShowingExpansions = false;
+
+    private LinearLayout.LayoutParams popupLp()
+    {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(dp(4), dp(3), dp(4), dp(3));
+        return lp;
+    }
+
     private void closePopup()
     {
+        mShowingExpansions = false;
         mPopup.setVisibility(View.GONE);
     }
 

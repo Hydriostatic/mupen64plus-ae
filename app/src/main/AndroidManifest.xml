@@ -391,6 +391,14 @@
             android:resizeableActivity="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale"
             android:theme="@style/Theme.SecondScreen" />
+
+        <!-- "Import expansion": opens the file picker on the second screen, stores the .exp -->
+        <activity
+            android:name="paulscode.android.mupen64plusae.game.ExpansionImportActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density|fontScale"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <activity
             android:name="paulscode.android.mupen64plusae.ImportExportActivity"
             android:exported="false"
