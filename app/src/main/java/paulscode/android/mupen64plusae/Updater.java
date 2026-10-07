@@ -56,7 +56,7 @@ public final class Updater
     public static final String REPO = "Hydriostatic/mupen64plus-ae";
     /** Only releases of this app (the repository also has releases of other builds). */
     public static final String TAG_PREFIX = "exp-";
-    private static final String RELEASES = "https://api.github.com/repos/" + REPO + "/releases?per_page=40";
+    private static final String RELEASES = "https://api.github.com/repos/" + REPO + "/releases?per_page=100";
     private static final Pattern NUMBER = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)");
 
     private Updater() {}
