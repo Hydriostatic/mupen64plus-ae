@@ -401,7 +401,33 @@ def outline_of(im, rgb, th=1):
                        for dx in range(-th, th + 1) for dy in range(-th, th + 1))
             if edge: out.putpixel((x, y), rgb + (255,))
     return out
-SH_BIG_HOLE = outline_of(SH_BIG, (96, 70, 210), 2)              # purple outline, like the game's strip
+SH_BIG_HOLE = outline_of(SH_BIG, (96, 70, 210), 2)
+def crayon_strip(w, h, seed, shade=1.0):
+    """A green strip drawn in chalk: diagonal strokes of slightly different greens, gaps where the
+    paper shows through, ragged edges and a heavier rim, like the game's hand-drawn strip."""
+    rnd = random.Random(seed)
+    base = [(150, 214, 158), (136, 204, 146), (166, 224, 172), (122, 192, 134)]
+    base = [tuple(int(c * shade) for c in col) for col in base]
+    out = Image.new('RGBA', (w, h))
+    left = [rnd.choice((0, 1, 1, 2, 3)) for _ in range(h)]; right = [rnd.choice((0, 1, 1, 2, 3)) for _ in range(h)]
+    top = [rnd.choice((0, 1, 1, 2, 3)) for _ in range(w)]; bot = [rnd.choice((0, 1, 1, 2, 3)) for _ in range(w)]
+    inside = lambda x, y: not (x < left[y] or x >= w - right[y] or y < top[x] or y >= h - bot[x])
+    # strokes: short diagonal lines going up-right, overlapping, each in one green
+    for _ in range(w * h // 5):
+        x, y = rnd.randrange(-4, w), rnd.randrange(0, h + 4)
+        col = rnd.choice(base); n = rnd.randint(3, 7)
+        for k in range(n):
+            px, py = x + k, y - k
+            if 0 <= px < w and 0 <= py < h and inside(px, py) and rnd.random() > .12:
+                out.putpixel((px, py), col + (255,))
+    # rim: heavier chalk along the ragged edge
+    for y in range(h):
+        for x in range(w):
+            if not inside(x, y): continue
+            edge = x <= left[y] + 1 or x >= w - right[y] - 2 or y <= top[x] + 1 or y >= h - bot[x] - 2
+            if edge and rnd.random() > .2:
+                r, g, b = rnd.choice(base); out.putpixel((x, y), (int(r * .72), int(g * .78), int(b * .72), 255))
+    return out              # purple outline, like the game's strip
 STRIP = (150, 214, 158, 255); STRIP_DARK = (104, 170, 112, 255)
 def stage_select_bg(boss):
     T = Image.new('RGBA', (IW, IH))
@@ -420,10 +446,10 @@ def stage_select_bg(boss):
         d.ellipse((x, oy + 19, x + 5, oy + 22), fill=(150, 150, 150, 255))
         d.arc((x - 1, oy + 9, x + 6, oy + 22), 180, 360, fill=(220, 40, 30, 255), width=2)
     T.alpha_composite(level_word, (ox + X0 + 132, oy + 32))
-    if boss:                                                                   # strip behind the boss name
-        rounded(d, ox + 80, oy + 70, 88, 21, (60, 120, 70, 255))
-    rounded(d, ox + 44, oy + 114, 160, 50, STRIP_DARK)                          # green strip
-    rounded(d, ox + 45, oy + 115, 158, 48, STRIP)
+    if boss:                                                                   # crayon strip behind the boss name
+        rounded(d, ox + 82, oy + 72, 84, 17, (46, 96, 56, 255))                 # solid base so the name reads
+        T.alpha_composite(crayon_strip(88, 21, 5, .5), (ox + 80, oy + 70))
+    T.alpha_composite(crayon_strip(160, 50, 11), (ox + 44, oy + 114))         # green crayon strip
     for x in ([SS_SH_X[1]] if boss else SS_SH_X):
         T.alpha_composite(SH_BIG_HOLE, (ox + x, oy + 125))
     return T
