@@ -156,6 +156,49 @@ Uma segunda página, desenhada sobre uma imagem de template que mantém a propor
 - `tabs` → `action`: `screen:main` (página de blocos), `screen:map`, `menu` (menu do emulador),
   `save_quit`.
 
+## Página em pixel art (`pixel_screen`, opcional)
+
+Uma página montada com sprites sobre uma tela pequena, no tamanho de pixel do próprio jogo. O
+emulador amplia essa tela pelo maior número inteiro que couber, sem suavizar, e a centraliza (as
+sobras ficam na cor `fill`). Serve para refazer o HUD de um jogo com a arte dele. Se existir, é a
+página que abre primeiro. O menu continua no botão Voltar.
+
+```json
+"pixel_screen": {
+  "size": [248, 199],
+  "fill": "#9C7318",
+  "layers": [
+    { "image": "images/bg.png", "x": 0, "y": 0 },
+    { "repeat": "images/cell.png", "count": "hp", "max": 6, "dx": 20, "x": 101, "y": 6 },
+    { "pick": "ability_l", "images": { "1": "icons/fire.png", "7": "icons/cutter.png" },
+      "anchor": "center", "x": 46, "y": 111 },
+    { "number": "lives", "glyphs": "digits/{c}.png", "pad": 2, "advance": 20, "x": 43, "y": 12 },
+    { "image": "icons/shard.png", "x": 124, "y": 109, "show": "s0_0", "hide": "is_dark" }
+  ],
+  "buttons": [ { "x": 0, "y": 0, "w": 40, "h": 20, "action": "menu" } ]
+}
+```
+
+As posições são em pixels da tela (`size`). As camadas são desenhadas na ordem da lista:
+
+| camada | o que desenha |
+|---|---|
+| `image` | uma imagem fixa |
+| `repeat` + `count` | a imagem repetida `count` vezes (até `max`), andando `dx`/`dy` a cada uma |
+| `pick` + `images` | a imagem escolhida pelo valor (`"default"` vale quando nenhuma combina); sem imagem, nada |
+| `number` + `glyphs` | o valor desenhado com uma imagem por caractere: `{c}` vira `0`–`9`, `slash`, `minus`, `colon`, `dot` ou `percent`. `pad` completa com zeros à esquerda; `advance` é a largura de cada caractere (sem ele, usa a largura da imagem); `align`: `left`, `right` ou `center` |
+
+- `anchor: "center"` faz `x`/`y` serem o centro da imagem.
+- `show` / `hide`: o nome de um valor. A camada só aparece se `show` for diferente de 0 e se
+  `hide` for 0.
+- Enquanto o jogo não começa, só as camadas fixas aparecem.
+- `buttons` (opcional): áreas de toque com as mesmas ações das abas do mapa (`menu`,
+  `save_quit`, `screen:map`). A arte do botão vai numa camada.
+- Segure a página para salvar uma cópia da memória, como no nome do mundo das outras páginas.
+
+O exemplo é `examples/expansions/make_kirby64.py`, que monta o `kirby64.exp` a partir da sua ROM
+do Kirby 64 (USA), cortando a arte do HUD do próprio jogo.
+
 ### Mais tipos de valor
 
 | `type` | campos | resultado |

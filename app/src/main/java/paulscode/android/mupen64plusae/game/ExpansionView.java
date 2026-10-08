@@ -87,10 +87,124 @@ public class ExpansionView extends View
         Typeface tf = expansion.typeface(context.getCacheDir());
         if (tf == null) tf = Typeface.create("sans-serif-black", Typeface.BOLD);
         mText.setTypeface(tf);
-        mOnMap = expansion.mapScreen != null;
+        // Start on the pixel page if there is one, else on the map page if there is one
+        mOnMap = expansion.mapScreen != null && expansion.pixelScreen == null;
         int tabs = expansion.mapScreen != null ? expansion.mapScreen.tabs.size() : 0;
         mTabRects = new RectF[tabs];
         for (int i = 0; i < tabs; i++) mTabRects[i] = new RectF();
+        int btns = expansion.pixelScreen != null ? expansion.pixelScreen.buttons.size() : 0;
+        mPixelBtnRects = new RectF[btns];
+        for (int i = 0; i < btns; i++) mPixelBtnRects[i] = new RectF();
+        mPixel.setFilterBitmap(false);
+        mPixel.setAntiAlias(false);
+        mPixel.setDither(false);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Pixel page: sprites on a small canvas, scaled up by a whole number with no smoothing
+    // ---------------------------------------------------------------------------------------------
+
+    private final Paint mPixel = new Paint();
+    private final RectF[] mPixelBtnRects;
+    private float mPs, mPx, mPy; // pixel-page scale and offset on the view
+
+    private boolean truthy(String key)
+    {
+        Object v = mReader.value(key, 0);
+        if (v instanceof Long) return (Long) v != 0;
+        return v != null && !String.valueOf(v).isEmpty() && !"0".equals(String.valueOf(v));
+    }
+
+    private void sprite(Canvas c, String path, float x, float y, boolean center)
+    {
+        Bitmap b = mExp.image(path);
+        if (b == null) return;
+        float l = center ? x - b.getWidth() / 2f : x, t = center ? y - b.getHeight() / 2f : y;
+        // Snap to whole canvas pixels so the art stays crisp
+        l = (float) Math.floor(l); t = (float) Math.floor(t);
+        mBox.set(mPx + l * mPs, mPy + t * mPs, mPx + (l + b.getWidth()) * mPs, mPy + (t + b.getHeight()) * mPs);
+        c.drawBitmap(b, null, mBox, mPixel);
+    }
+
+    private void drawPixelScreen(Canvas c, float w, float h)
+    {
+        Expansion.PixelScreen ps = mExp.pixelScreen;
+        c.drawColor(ps.fill);
+        float s = Math.min(w / ps.width, h / ps.height);
+        mPs = s >= 1 ? (float) Math.floor(s) : s;
+        mPx = (float) Math.floor((w - ps.width * mPs) / 2);
+        mPy = (float) Math.floor((h - ps.height * mPs) / 2);
+
+        for (Expansion.Layer ly : ps.layers) {
+            boolean dynamic = !ly.value.isEmpty() || !ly.show.isEmpty() || !ly.hide.isEmpty();
+            if (dynamic && !mValid) continue;          // until the game runs, only the fixed art
+            if (!ly.show.isEmpty() && !truthy(ly.show)) continue;
+            if (!ly.hide.isEmpty() && truthy(ly.hide)) continue;
+            switch (ly.kind) {
+                case "image":
+                    sprite(c, ly.image, ly.x, ly.y, ly.center);
+                    break;
+                case "repeat": {
+                    Long n = mReader.number(ly.value);
+                    int count = n == null ? 0 : (int) Math.max(0, Math.min(ly.max, n));
+                    for (int i = 0; i < count; i++) sprite(c, ly.image, ly.x + i * ly.dx, ly.y + i * ly.dy, ly.center);
+                    break;
+                }
+                case "pick": {
+                    Object v = mReader.value(ly.value, 0);
+                    String path = v != null ? ly.images.get(String.valueOf(v)) : null;
+                    if (path == null) path = ly.images.get("default");
+                    sprite(c, path, ly.x, ly.y, ly.center);
+                    break;
+                }
+                case "number": {
+                    Object v = mReader.value(ly.value, 0);
+                    if (v == null) break;
+                    String str = String.valueOf(v);
+                    while (str.length() < ly.pad) str = "0" + str;
+                    // Width first (for right/center alignment)
+                    int total = 0;
+                    for (int i = 0; i < str.length(); i++) {
+                        Bitmap g = mExp.image(ly.glyphs.replace("{c}", glyphName(str.charAt(i))));
+                        total += ly.advance > 0 ? ly.advance : (g != null ? g.getWidth() : 0);
+                    }
+                    float x = "right".equals(ly.align) ? ly.x - total : "center".equals(ly.align) ? ly.x - total / 2f : ly.x;
+                    for (int i = 0; i < str.length(); i++) {
+                        String path = ly.glyphs.replace("{c}", glyphName(str.charAt(i)));
+                        Bitmap g = mExp.image(path);
+                        sprite(c, path, x, ly.y, false);
+                        x += ly.advance > 0 ? ly.advance : (g != null ? g.getWidth() : 0);
+                    }
+                    break;
+                }
+            }
+        }
+
+        for (int i = 0; i < mPixelBtnRects.length; i++) {
+            Expansion.Tab t = ps.buttons.get(i);
+            mPixelBtnRects[i].set(mPx + t.x * mPs, mPy + t.y * mPs, mPx + (t.x + t.w) * mPs, mPy + (t.y + t.h) * mPs);
+        }
+        RectF all = new RectF(mPx, mPy, mPx + ps.width * mPs, mPy + ps.height * mPs);
+        if (mConfirmQuit) {
+            drawConfirm(c, all.left, all.top + all.height() * 0.2f, all.right, all.bottom - all.height() * 0.2f);
+        } else if (!mValid) {
+            banner(c, "Waiting for the game…", all);
+        }
+        // Hold anywhere on the page to save a memory snapshot (for writing expansions)
+        mTitleRect.set(all);
+    }
+
+    /** File name for a character in a number: digits as is, a few symbols spelled out. */
+    private static String glyphName(char ch)
+    {
+        switch (ch) {
+            case '/': return "slash";
+            case '-': return "minus";
+            case ':': return "colon";
+            case '.': return "dot";
+            case '%': return "percent";
+            default: return String.valueOf(ch);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -147,6 +261,10 @@ public class ExpansionView extends View
         if (w <= 0 || h <= 0) return;
         if (mOnMap && mExp.mapScreen != null) {
             drawMapScreen(c, w, h);
+            return;
+        }
+        if (mExp.pixelScreen != null) {
+            drawPixelScreen(c, w, h);
             return;
         }
         final float pad = w * 0.022f;
@@ -723,6 +841,25 @@ public class ExpansionView extends View
                 performClick();
                 return true;
             }
+            return true;
+        }
+        if (!mOnMap && mExp.pixelScreen != null) {
+            if (mConfirmQuit) {
+                if (mYesRect.contains(x, y)) { mConfirmQuit = false; if (mSaveAndQuit != null) mSaveAndQuit.run(); }
+                else if (mNoRect.contains(x, y)) mConfirmQuit = false;
+                invalidate();
+                return true;
+            }
+            for (int i = 0; i < mPixelBtnRects.length; i++) {
+                if (!mPixelBtnRects[i].contains(x, y)) continue;
+                String action = mExp.pixelScreen.buttons.get(i).action;
+                if ("screen:map".equals(action) && mExp.mapScreen != null) mOnMap = true;
+                else if ("menu".equals(action)) { if (mOpenMenu != null) mOpenMenu.run(); }
+                else if ("save_quit".equals(action)) mConfirmQuit = true;
+                invalidate();
+                break;
+            }
+            performClick();
             return true;
         }
         if (!mOnMap && mMapBtnRect.contains(x, y)) {
