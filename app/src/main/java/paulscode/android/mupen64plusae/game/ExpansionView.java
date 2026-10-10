@@ -126,15 +126,19 @@ public class ExpansionView extends View
         c.drawBitmap(b, null, mBox, mPixel);
     }
 
-    private void drawPixelScreen(Canvas c, float w, float h)
-    {
-        Expansion.PixelScreen ps = mExp.pixelScreen;
-        c.drawColor(ps.fill);
-        float s = Math.min(w / ps.width, h / ps.height);
-        mPs = s >= 1 ? (float) Math.floor(s) : s;
-        mPx = (float) Math.floor((w - ps.width * mPs) / 2);
-        mPy = (float) Math.floor((h - ps.height * mPs) / 2);
+    // The page is drawn at its own size into a buffer, then scaled up. Two buffers alternate so
+    // the previous frame is still there when a transition starts.
+    private Bitmap mBufA, mBufB, mLast, mOld, mComp;
+    private Object mTransLast;
+    private long mTransStart;
+    private android.graphics.Path[] mPieces;
+    private final Paint mEdge = new Paint();
+    private final Rect mPageSrc = new Rect();
+    private static final long FRAME_MS = 33;           // animations and transitions: ~30 fps
 
+    private void drawLayers(Canvas c, Expansion.PixelScreen ps, long now)
+    {
+        c.drawColor(ps.fill);
         for (Expansion.Layer ly : ps.layers) {
             boolean dynamic = !ly.value.isEmpty() || !ly.show.isEmpty() || !ly.hide.isEmpty();
             if (dynamic && !mValid) continue;          // until the game runs, only the fixed art
@@ -144,6 +148,12 @@ public class ExpansionView extends View
                 case "image":
                     sprite(c, ly.image, ly.x, ly.y, ly.center);
                     break;
+                case "frames": {
+                    long f = (long) Math.floor(now / 1000.0 * ly.fps + ly.phase);
+                    int frame = (int) (((f % ly.length) + ly.length) % ly.length);
+                    sprite(c, ly.image.replace("{f}", String.valueOf(frame)), ly.x, ly.y, ly.center);
+                    break;
+                }
                 case "repeat": {
                     Long n = mReader.number(ly.value);
                     int count = n == null ? 0 : (int) Math.max(0, Math.min(ly.max, n));
@@ -179,6 +189,135 @@ public class ExpansionView extends View
                 }
             }
         }
+    }
+
+    /** Jigsaw pieces covering the page: a grid with a round tab or notch on every inner edge. */
+    private android.graphics.Path[] jigsaw(Expansion.PixelScreen ps)
+    {
+        int cols = ps.transCols, rows = ps.transRows;
+        float pw = (float) Math.ceil(ps.width / (float) cols), ph = (float) Math.ceil(ps.height / (float) rows);
+        float r = Math.max(2, Math.min(pw, ph) * 0.16f);
+        java.util.Random rnd = new java.util.Random(7);
+        boolean[][] right = new boolean[rows][cols], down = new boolean[rows][cols];
+        for (int y = 0; y < rows; y++) for (int x = 0; x < cols; x++) { right[y][x] = rnd.nextBoolean(); down[y][x] = rnd.nextBoolean(); }
+        android.graphics.Path[] out = new android.graphics.Path[cols * rows];
+        android.graphics.Path knob = new android.graphics.Path();
+        for (int y = 0; y < rows; y++) {
+            for (int x = 0; x < cols; x++) {
+                float l = x * pw, t = y * ph;
+                android.graphics.Path p = new android.graphics.Path();
+                p.addRect(l, t, l + pw, t + ph, android.graphics.Path.Direction.CW);
+                // right edge, bottom edge (own), left edge, top edge (the neighbour's, mirrored)
+                if (x < cols - 1) knobOp(p, knob, l + pw + (right[y][x] ? r - 1 : 1 - r), t + ph / 2, r, right[y][x]);
+                if (y < rows - 1) knobOp(p, knob, l + pw / 2, t + ph + (down[y][x] ? r - 1 : 1 - r), r, down[y][x]);
+                if (x > 0) knobOp(p, knob, l + (right[y][x - 1] ? r - 1 : 1 - r), t + ph / 2, r, !right[y][x - 1]);
+                if (y > 0) knobOp(p, knob, l + pw / 2, t + (down[y - 1][x] ? r - 1 : 1 - r), r, !down[y - 1][x]);
+                out[y * cols + x] = p;
+            }
+        }
+        return out;
+    }
+
+    private static void knobOp(android.graphics.Path p, android.graphics.Path knob, float cx, float cy, float r, boolean add)
+    {
+        knob.reset();
+        knob.addCircle(cx, cy, r, android.graphics.Path.Direction.CW);
+        p.op(knob, add ? android.graphics.Path.Op.UNION : android.graphics.Path.Op.DIFFERENCE);
+    }
+
+    private void drawTransition(Canvas c, Expansion.PixelScreen ps, Bitmap fresh, float u)
+    {
+        c.drawBitmap(mOld, 0, 0, null);
+        if ("fade".equals(ps.transStyle)) {
+            mEdge.setAlpha((int) (255 * u));
+            c.drawBitmap(fresh, 0, 0, mEdge);
+            mEdge.setAlpha(255);
+            return;
+        }
+        if (mPieces == null) mPieces = jigsaw(ps);
+        // Pieces start one after another in a fixed shuffled order over the first 70% and each
+        // takes the remaining 30% to drop into place.
+        int n = mPieces.length;
+        int[] order = new int[n];
+        for (int i = 0; i < n; i++) order[i] = i;
+        java.util.Random rnd = new java.util.Random(11);
+        for (int i = n - 1; i > 0; i--) { int j = rnd.nextInt(i + 1); int t = order[i]; order[i] = order[j]; order[j] = t; }
+        for (int k = 0; k < n; k++) {
+            float start = 0.7f * k / n;
+            float v = (u - start) / 0.3f;
+            if (v <= 0) continue;
+            v = Math.min(1, v);
+            float dy = -(1 - v) * (1 - v) * ps.height * 0.09f;
+            android.graphics.Path p = mPieces[order[k]];
+            c.save();
+            c.translate(0, (float) Math.floor(dy));
+            if (v < 1) {                                   // shadow and outline while it falls
+                c.save(); c.translate(2, 2);
+                mEdge.setStyle(Paint.Style.FILL); mEdge.setColor(0x5A000000); c.drawPath(p, mEdge);
+                c.restore();
+            }
+            c.save();
+            c.clipPath(p);
+            c.drawBitmap(fresh, 0, 0, null);
+            c.restore();
+            if (v < 1) {
+                mEdge.setStyle(Paint.Style.STROKE); mEdge.setStrokeWidth(1); mEdge.setColor(0xFF1E0F00);
+                c.drawPath(p, mEdge);
+            }
+            c.restore();
+        }
+        mEdge.setStyle(Paint.Style.FILL); mEdge.setColor(0xFF000000);
+    }
+
+    private void drawPixelScreen(Canvas c, float w, float h)
+    {
+        Expansion.PixelScreen ps = mExp.pixelScreen;
+        c.drawColor(ps.fill);
+        float s = Math.min(w / ps.width, h / ps.height);
+        float scale = s >= 1 ? (float) Math.floor(s) : s;
+        float ox = (float) Math.floor((w - ps.width * scale) / 2);
+        float oy = (float) Math.floor((h - ps.height * scale) / 2);
+        long now = SystemClock.uptimeMillis();
+
+        // 1. This frame at the page's own size
+        if (mBufA == null) {
+            mBufA = Bitmap.createBitmap(ps.width, ps.height, Bitmap.Config.ARGB_8888);
+            mBufB = Bitmap.createBitmap(ps.width, ps.height, Bitmap.Config.ARGB_8888);
+            mComp = Bitmap.createBitmap(ps.width, ps.height, Bitmap.Config.ARGB_8888);
+        }
+        Bitmap target = mLast == mBufA ? mBufB : mBufA;
+        mPs = 1; mPx = 0; mPy = 0;
+        drawLayers(new Canvas(target), ps, now);
+
+        // 2. A transition starts when its value changes while the game runs
+        if (!ps.transValue.isEmpty() && mValid) {
+            Object v = mReader.value(ps.transValue, 0);
+            if (v != null && mTransLast != null && !v.equals(mTransLast) && mLast != null) {
+                if (mOld == null) mOld = Bitmap.createBitmap(ps.width, ps.height, Bitmap.Config.ARGB_8888);
+                new Canvas(mOld).drawBitmap(mLast, 0, 0, null);
+                mTransStart = now;
+            }
+            if (v != null) mTransLast = v;
+        }
+        Bitmap shown = target;
+        boolean moving = ps.animated;
+        if (mTransStart != 0) {
+            float u = (now - mTransStart) / (float) ps.transMs;
+            if (u >= 1) mTransStart = 0;
+            else {
+                Canvas cc = new Canvas(mComp);
+                drawTransition(cc, ps, target, u);
+                shown = mComp;
+                moving = true;
+            }
+        }
+        mLast = target;
+
+        // 3. Scaled up with no smoothing
+        mPs = scale; mPx = ox; mPy = oy;
+        mPageSrc.set(0, 0, ps.width, ps.height);
+        mBox.set(ox, oy, ox + ps.width * scale, oy + ps.height * scale);
+        c.drawBitmap(shown, mPageSrc, mBox, mPixel);
 
         for (int i = 0; i < mPixelBtnRects.length; i++) {
             Expansion.Tab t = ps.buttons.get(i);
@@ -192,6 +331,8 @@ public class ExpansionView extends View
         }
         // Hold anywhere on the page to save a memory snapshot (for writing expansions)
         mTitleRect.set(all);
+        // Keep animating while this page is on screen (onDraw stops when it isn't shown)
+        if (moving && mRunning) postInvalidateDelayed(FRAME_MS);
     }
 
     /** File name for a character in a number: digits as is, a few symbols spelled out. */

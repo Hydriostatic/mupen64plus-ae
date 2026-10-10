@@ -79,13 +79,16 @@ public final class Expansion
 
     /**
      * One sprite layer on the pixel page. Kinds: "image" (fixed), "repeat" (an image drawn
-     * {count} times), "pick" (the image chosen by a value) and "number" (a value drawn with
-     * one image per character). Any layer can be shown/hidden by a value (non-zero = true).
+     * {count} times), "pick" (the image chosen by a value), "number" (a value drawn with
+     * one image per character) and "frames" (an animation: "{f}" in the path is the frame
+     * number, 0 to length - 1, played at fps). Any layer can be shown/hidden by a value
+     * (non-zero = true).
      */
     static final class Layer
     {
         final String kind, image, value, glyphs, align, show, hide;
-        final int x, y, dx, dy, max, pad, advance;
+        final int x, y, dx, dy, max, pad, advance, length;
+        final float fps, phase;
         final boolean center;
         final Map<String, String> images = new HashMap<>();
         Layer(JSONObject o) throws JSONException
@@ -93,6 +96,7 @@ public final class Expansion
             if (o.has("repeat")) { kind = "repeat"; image = o.getString("repeat"); value = o.optString("count", ""); }
             else if (o.has("pick")) { kind = "pick"; image = null; value = o.getString("pick"); }
             else if (o.has("number")) { kind = "number"; image = null; value = o.getString("number"); }
+            else if (o.has("frames")) { kind = "frames"; image = o.getString("frames"); value = ""; }
             else { kind = "image"; image = o.getString("image"); value = ""; }
             x = o.optInt("x", 0); y = o.optInt("y", 0);
             dx = o.optInt("dx", 0); dy = o.optInt("dy", 0);
@@ -100,6 +104,9 @@ public final class Expansion
             glyphs = o.optString("glyphs", "");
             pad = o.optInt("pad", 0);
             advance = o.optInt("advance", 0);
+            length = Math.max(1, o.optInt("length", 1));
+            fps = (float) o.optDouble("fps", 15);
+            phase = (float) o.optDouble("phase", 0);
             align = o.optString("align", "left");
             center = "center".equals(o.optString("anchor", ""));
             show = o.optString("show", "");
@@ -120,6 +127,14 @@ public final class Expansion
         final List<Layer> layers = new ArrayList<>();
         /** Tap areas in canvas pixels (same actions as map tabs); draw their art as layers. */
         final List<Tab> buttons = new ArrayList<>();
+        /** Any "frames" layer: the page is redrawn continuously while it's on screen. */
+        final boolean animated;
+        /**
+         * Optional page transition, played when the named value changes (e.g. the world):
+         * style "jigsaw" (the new page drops in as puzzle pieces) or "fade"; ms long.
+         */
+        final String transValue, transStyle;
+        final int transMs, transCols, transRows;
         PixelScreen(JSONObject o, int defaultFill) throws JSONException
         {
             JSONArray size = o.getJSONArray("size");
@@ -130,6 +145,15 @@ public final class Expansion
             for (int i = 0; ls != null && i < ls.length(); i++) layers.add(new Layer(ls.getJSONObject(i)));
             JSONArray bs = o.optJSONArray("buttons");
             for (int i = 0; bs != null && i < bs.length(); i++) buttons.add(new Tab(bs.getJSONObject(i)));
+            boolean anim = false;
+            for (Layer l : layers) anim |= "frames".equals(l.kind);
+            animated = anim;
+            JSONObject tr = o.optJSONObject("transition");
+            transValue = tr != null ? tr.optString("value", "") : "";
+            transStyle = tr != null ? tr.optString("style", "jigsaw") : "";
+            transMs = tr != null ? Math.max(100, tr.optInt("ms", 850)) : 0;
+            transCols = tr != null ? Math.max(1, tr.optInt("cols", 8)) : 0;
+            transRows = tr != null ? Math.max(1, tr.optInt("rows", 7)) : 0;
         }
     }
 
