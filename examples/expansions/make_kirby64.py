@@ -227,7 +227,7 @@ values = {
     # 0 = power-on, 2 = between logos and title, 11 = world select (no panel yet): black
     "is_blank": {"type": "lookup", "value": "scene", "default": 0, "table": {"0": 1, "2": 1}},
     "is_play": {"type": "lookup", "value": "scene", "default": 1,
-                "table": {str(s): 0 for s in (0, 1, 2, 3, 5, 7, 9, 10, 11, 12)}},
+                "table": {str(s): 0 for s in (0, 1, 2, 3, 5, 7, 9, 10, 11, 12, *range(22, 35))}},
     "fade_obj": {"type": "u32", "addr": "0x800D6B24"},
     "fade_on": {"type": "lookup", "value": "fade_obj", "default": 1, "table": {"0": 0}},
     "fade_alpha": {"type": "s16", "addr": "0x800D6B2E"},
@@ -608,6 +608,158 @@ for s in range(4):
 WL = [{"image": "images/ws_bg.png", "x": IX, "y": IY, "show": "is_wsel"}]
 ML += WL
 
+# ---------------------------------------------------------------------------------------------
+# Main-menu screens (ovl5) and the three mini-games.
+#   22-28: Theater, Options and the other main-menu screens: the menu paper (bank 3 #0x45, the
+#          left half of the paper, mirrored).
+#   23:    Mini-Games menu: the selected game's picture and name, its Best Score from the save and
+#          the difficulties unlocked. The cursor is D_8018EDE1 (0 Hop, 1 Bumper, 2 Checker).
+#   29/30/31: 100-Yard Hop / Checkerboard Chase / Bumper Crop Bump, on a notebook page:
+#          the game, its Best Score and, live, each player's time (Hop: frames at D_8018E468,
+#          30 per second) or score (Bumper: bytes at D_8018E1E0).
+# Records live in the save at +0x18 (Hop, frames), +0x1A (Bumper, points), +0x1C (Checker,
+# frames); unlocked difficulty at D_800D6BB9 (Hop), D_800D6BBA (Bumper), D_800D6BBB (Checker).
+# ---------------------------------------------------------------------------------------------
+def tint_light(im, rgb):
+    out = Image.new('RGBA', im.size)
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = im.getpixel((x, y))
+            if a:
+                l = (r + g + b) / 765
+                out.putpixel((x, y), tuple(int(rgb[k] * (0.45 + 0.55 * l)) for k in range(3)) + (a,))
+    return out
+def x2(im): return im.resize((im.width * 2, im.height * 2), Image.NEAREST)
+
+half = sprite(3, 0x45)                                               # 150x220
+def paper_bg():
+    Lh = Image.new('RGBA', (124, GH))
+    Lh.paste(half.crop((0, 0, 124, 100)), (0, 0)); Lh.paste(half.crop((0, 220 - 99, 124, 220)), (0, 100))
+    T = Image.new('RGBA', (IW, IH), half.getpixel((2, 110))[:3] + (255,))
+    T.paste(Lh, (-IX, -IY)); T.paste(ImageOps.mirror(Lh), (-IX + 124, -IY))
+    return T
+def notebook_bg():
+    """The stage select's sketchbook page, without its title and crystal strip."""
+    T = Image.new('RGBA', (IW, IH))
+    T.paste(chalk_grass(IW, IH, 33), (0, 0))
+    ox, oy = -IX, -IY
+    tile(T, TEX_CARD, (ox + 12, oy + 10, ox + 240, oy + 196))
+    for dx, dy in ((5, 6), (2, 3)):
+        tile(T, TEX_EDGE, (ox + 8 + dx, oy + 14 + dy, ox + 234 + dx, oy + 192 + dy))
+    page = Image.new('RGBA', (226, 178)); tile(page, TEX_PAPER, (0, 0, 226, 178))
+    for x in range(0, 226, 12):
+        for y in range(0, 4 if (x // 12) % 2 else 2):
+            for xx in range(x, min(x + 12, 226)): page.putpixel((xx, y), (0, 0, 0, 0))
+    T.alpha_composite(page, (ox + 8, oy + 14))
+    d = ImageDraw.Draw(T)
+    for x in range(ox + 22, ox + 228, 18):
+        d.ellipse((x, oy + 19, x + 5, oy + 22), fill=(150, 150, 150, 255))
+        d.arc((x - 1, oy + 9, x + 6, oy + 22), 180, 360, fill=(220, 40, 30, 255), width=2)
+    return T
+
+MG_THUMB = {g: sprite(3, 0x49 + g) for g in range(3)}               # 64x64 pictures
+MG_NAME = {g: sprite(3, 0x4C + g) for g in range(3)}                 # 64x46 names
+BEST = sprite(3, 0x2F0)                                              # 'Best Score'
+DIFF = [sprite(3, 0x8B + k) for k in range(4)]                       # Easy .. Intense!
+CROWN = sprite(3, 0x389)
+PLATE = [sprite(3, 0x317 + p) for p in range(4)]                     # Bumper players' plates
+PNAME = [sprite(3, 0x374 + p) for p in range(4)]                     # 1P..4P
+CLOCK = sprite(3, 0x379)
+BROWN, PCOL = (96, 58, 14), [(240, 110, 140), (240, 170, 60), (110, 200, 90), (90, 140, 235)]
+MGD = {str(d): sprite(3, 0x341 + d) for d in range(10)}; MGD["colon"] = sprite(3, 0x340).crop((0, 2, 4, 12))   # same height as the digits
+def glyph(im, rgb):
+    """These digits are intensity images (grey = coverage): one colour, coverage as alpha."""
+    out = Image.new('RGBA', im.size)
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = im.getpixel((x, y))
+            out.putpixel((x, y), rgb + (min(a, r),))
+    return out
+for name, im in MGD.items():
+    files_extra["mgd/%s.png" % name] = x2(glyph(im, BROWN))          # brown, 2x (records)
+    files_extra["mgw/%s.png" % name] = x2(glyph(im, (255, 255, 255)))  # white, 2x (live)
+def diff_strip(unl):
+    """The four difficulties in two rows; unlocked ones in gold, the crown when all are."""
+    T = Image.new('RGBA', (180, 40))
+    for k in range(4):
+        dd = DIFF[k].crop(DIFF[k].getbbox())
+        T.alpha_composite(tint_light(dd, (220, 150, 40)) if k <= unl else dd,
+                          ((0 if k % 2 == 0 else 86), (0 if k < 2 else 20)))
+    if unl >= 3: T.alpha_composite(CROWN, (152, 8))
+    return T
+for u in range(4): files_extra["images/mg_diff_%d.png" % u] = diff_strip(u)
+for g in range(3):
+    files_extra["images/mg_thumb_%d.png" % g] = MG_THUMB[g]
+    files_extra["images/mg_name_%d.png" % g] = MG_NAME[g]
+files_extra["images/mg_best.png"] = BEST
+files_extra["images/paper_bg.png"] = paper_bg()
+files_extra["images/notebook_bg.png"] = notebook_bg()
+hop_rows = Image.new('RGBA', (GW, GH)); d = ImageDraw.Draw(hop_rows)
+HOP_Y = [96 + 22 * p for p in range(4)]
+for p in range(4):
+    rounded(d, 40, HOP_Y[p], 168, 19, PCOL[p] + (255,))
+    hop_rows.alpha_composite(PNAME[p], (46, HOP_Y[p] + 4)); hop_rows.alpha_composite(CLOCK, (76, HOP_Y[p] + 2))
+files_extra["images/mg_hop_rows.png"] = hop_rows
+bump = Image.new('RGBA', (GW, GH))
+BUMP_X = [26 + 50 * p for p in range(4)]
+for p in range(4): bump.alpha_composite(x2(PLATE[p]), (BUMP_X[p], 104))
+files_extra["images/mg_bump_plates.png"] = bump
+
+def frames_txt(f):
+    if f >= 0x464F: return "9:59:99"
+    return "%d:%02d:%02d" % (f // 30 // 60, f // 30 % 60, f % 30 * 3)
+REC_TABLE = {str(f): frames_txt(f) for f in range(9000)}             # up to 5 minutes
+LIVE_TABLE = {str(f): frames_txt(f) for f in range(3600)}            # up to 2 minutes
+SAVE = ["0x800ECA08", {"value": "cursor", "times": 0x58}]
+values.update({
+    "is_menu": {"type": "lookup", "value": "scene", "default": 0, "table": {str(s): 1 for s in range(22, 29)}},
+    "is_mgmenu": {"type": "lookup", "value": "scene", "default": 0, "table": {"23": 1}},
+    "is_mg": {"type": "lookup", "value": "scene", "default": 0, "table": {"29": 1, "30": 1, "31": 1}},
+    "is_hop": {"type": "lookup", "value": "scene", "default": 0, "table": {"29": 1}},
+    "is_bump": {"type": "lookup", "value": "scene", "default": 0, "table": {"31": 1}},
+    "is_chk": {"type": "lookup", "value": "scene", "default": 0, "table": {"30": 1}},
+    "mg_game": {"type": "lookup", "value": "scene", "default": 0, "table": {"29": 0, "31": 1, "30": 2}},
+    "mg_sel": {"type": "u8", "addr": "0x8018EDE1"},
+    "rec_hop_f": {"type": "u16", "chain": SAVE + ["0x18"]},
+    "rec_bump": {"type": "u16", "chain": SAVE + ["0x1A"]},
+    "rec_chk_f": {"type": "u16", "chain": SAVE + ["0x1C"]},
+    "rec_hop": {"type": "lookup", "value": "rec_hop_f", "default": "", "table": REC_TABLE},
+    "rec_chk": {"type": "lookup", "value": "rec_chk_f", "default": "", "table": REC_TABLE},
+    "unl_hop": {"type": "u8", "addr": "0x800D6BB9"},
+    "unl_bump": {"type": "u8", "addr": "0x800D6BBA"},
+    "unl_chk": {"type": "u8", "addr": "0x800D6BBB"},
+    "mgm_rec": {"type": "select", "index": "mg_sel", "options": ["rec_hop", "rec_bump", "rec_chk"]},
+    "mgm_unl": {"type": "select", "index": "mg_sel", "options": ["unl_hop", "unl_bump", "unl_chk"]},
+    "mg_rec": {"type": "select", "index": "mg_game", "options": ["rec_hop", "rec_bump", "rec_chk"]},
+    "mg_unl": {"type": "select", "index": "mg_game", "options": ["unl_hop", "unl_bump", "unl_chk"]},
+})
+for p in range(4):
+    values["hop_f%d" % p] = {"type": "u32", "addr": hex(0x8018E468 + 4 * p)}
+    values["hop_t%d" % p] = {"type": "lookup", "value": "hop_f%d" % p, "default": "", "table": LIVE_TABLE}
+    values["bump_s%d" % p] = {"type": "u8", "addr": hex(0x8018E1E0 + p)}
+
+GL = [{"image": "images/paper_bg.png", "x": IX, "y": IY, "show": "is_menu"}]
+# Mini-Games menu, everything inside the paper's light area (x 22-222, y 22-180)
+GL.append({"pick": "mg_sel", "show": "is_mgmenu", "x": 32, "y": 26, "images": {str(g): "images/mg_thumb_%d.png" % g for g in range(3)}})
+GL.append({"pick": "mg_sel", "show": "is_mgmenu", "x": 112, "y": 34, "images": {str(g): "images/mg_name_%d.png" % g for g in range(3)}})
+GL.append({"image": "images/mg_best.png", "x": 32, "y": 96, "show": "is_mgmenu"})
+GL.append({"number": "mgm_rec", "glyphs": "mgd/{c}.png", "x": 40, "y": 114, "show": "is_mgmenu"})
+GL.append({"pick": "mgm_unl", "show": "is_mgmenu", "x": 36, "y": 138, "images": {str(u): "images/mg_diff_%d.png" % u for u in range(4)}})
+# the mini-games themselves
+GL.append({"image": "images/notebook_bg.png", "x": IX, "y": IY, "show": "is_mg"})
+GL.append({"pick": "mg_game", "show": "is_mg", "x": 24, "y": 32, "images": {str(g): "images/mg_name_%d.png" % g for g in range(3)}})
+GL.append({"image": "images/mg_best.png", "x": 100, "y": 36, "show": "is_mg"})
+GL.append({"number": "mg_rec", "glyphs": "mgd/{c}.png", "x": 108, "y": 56, "show": "is_mg"})
+GL.append({"pick": "mg_unl", "show": "is_chk", "x": 36, "y": 110, "images": {str(u): "images/mg_diff_%d.png" % u for u in range(4)}})
+GL.append({"image": "images/mg_hop_rows.png", "x": 0, "y": 0, "show": "is_hop"})
+for p in range(4):
+    GL.append({"number": "hop_t%d" % p, "glyphs": "mgw/{c}.png", "x": 96, "y": HOP_Y[p] - 1, "show": "is_hop"})
+GL.append({"image": "images/mg_bump_plates.png", "x": 0, "y": 0, "show": "is_bump"})
+for p in range(4):
+    GL.append({"number": "bump_s%d" % p, "glyphs": "mgw/{c}.png", "pad": 2, "align": "center",
+               "x": BUMP_X[p] + 30, "y": 112, "show": "is_bump"})
+ML += GL
+
 idx = next(i for i, l in enumerate(L) if l.get("image") == "images/intro_files.png")
 L[idx + 1:idx + 1] = ML
 
@@ -644,7 +796,7 @@ def png(im):
     b = io.BytesIO(); im.save(b, 'PNG'); return b.getvalue()
 
 with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED) as z:
-    z.writestr("manifest.json", json.dumps(manifest, indent=1, ensure_ascii=False))
+    z.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, separators=(",", ":")))
     for path, im in files.items(): z.writestr(path, png(im))
 print('wrote', OUT, '(%d files)' % (len(files) + 1))
 
