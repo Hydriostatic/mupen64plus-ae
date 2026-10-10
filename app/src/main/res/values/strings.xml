@@ -1049,12 +1049,6 @@
     <string name="expansions_importFailed">Not a valid expansion: %1$s</string>
     <string name="expansions_removed">Expansion removed: %1$s</string>
     <string name="expansions_noPicker">No file picker found on this device.</string>
-    <string name="expansions_update">Update from GitHub</string>
-    <string name="expansions_updated">%1$s updated to v%2$s</string>
-    <string name="expansions_upToDate">%1$s is up to date (v%2$s)</string>
-    <string name="expansions_remoteOlder">The copy on GitHub (v%1$s) is older than yours (v%2$s); kept yours.</string>
-    <string name="expansions_notFound">No %1$s.exp found in the releases of m64ds-expansions.</string>
-    <string name="expansions_updateFailed">Couldn\'t update: %1$s</string>
     <string name="update_title">Update</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_available">Version %1$s is available (you have %2$s).</string>

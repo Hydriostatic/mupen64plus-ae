@@ -54,12 +54,6 @@ public final class Expansion
 
     // --- Identity ---
     public final String id, name, version, author, game;
-    /**
-     * Where the "update" button looks for a newer copy: "github:owner/repo" (releases of that
-     * repository, an asset named &lt;id&gt;.exp) or a direct https link to the .exp. Empty = this
-     * app's own repository.
-     */
-    public final String updateSource;
     public final File file;
 
     // --- ROM match ---
@@ -316,7 +310,6 @@ public final class Expansion
         version = m.optString("version", "1");
         author = m.optString("author", "");
         game = m.optString("game", name);
-        updateSource = m.optString("update", "").trim();
 
         JSONObject match = m.getJSONObject("match");
         mHeader = match.optString("header", "").trim().toUpperCase(Locale.US);

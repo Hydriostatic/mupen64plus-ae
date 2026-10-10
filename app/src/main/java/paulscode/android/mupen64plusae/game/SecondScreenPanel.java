@@ -39,8 +39,9 @@ import androidx.annotation.Nullable;
 final class SecondScreenPanel extends Presentation
 {
     private static final String TAG = "SecondScreenPanel";
-    /** The second screen when there's nothing to show on it. */
-    public static final int GREY = 0xFF808080;
+    /** The second screen when there's nothing to show on it: the same grey as the app's menus
+     *  (the dark AppCompat background the settings screens use). */
+    public static final int GREY = 0xFF303030;
 
     @Nullable private final Expansion mExpansion;
     private final Runnable mOpenMenu, mSaveAndQuit;
