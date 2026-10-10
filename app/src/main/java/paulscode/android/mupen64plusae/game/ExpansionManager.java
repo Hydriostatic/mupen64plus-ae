@@ -100,16 +100,26 @@ public final class ExpansionManager
             }
         }
         try {
-            Expansion probe = Expansion.load(tmp); // throws if it isn't a valid expansion
-            probe.close();
-            File target = new File(dir(context), probe.id + ".exp");
-            if (target.exists() && !target.delete()) throw new IOException("can't replace " + target.getName());
-            if (!tmp.renameTo(target)) throw new IOException("can't store expansion");
-            return Expansion.load(target);
+            return install(context, tmp);
         } finally {
             //noinspection ResultOfMethodCallIgnored
             tmp.delete();
         }
+    }
+
+    /**
+     * Install a downloaded/copied .exp file (moved into the app's storage). It is checked first;
+     * an expansion with the same id is replaced. Returns the installed expansion.
+     */
+    @NonNull
+    static Expansion install(@NonNull Context context, @NonNull File tmp) throws IOException
+    {
+        Expansion probe = Expansion.load(tmp); // throws if it isn't a valid expansion
+        probe.close();
+        File target = new File(dir(context), probe.id + ".exp");
+        if (target.exists() && !target.delete()) throw new IOException("can't replace " + target.getName());
+        if (!tmp.renameTo(target)) throw new IOException("can't store expansion");
+        return Expansion.load(target);
     }
 
     /** Remove an installed expansion. */

@@ -23,6 +23,7 @@ import android.hardware.display.DisplayManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Display;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
@@ -30,18 +31,21 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 /**
- * Shows an expansion's (.exp) panel on the device's second screen (e.g. the AYN Thor's bottom
- * screen) while a game runs. The game keeps the main screen and the controller: the panel's
- * window never takes key focus, it only receives touches.
+ * The device's second screen (e.g. the AYN Thor's bottom screen) while this app is open on the
+ * main screen: an expansion's (.exp) panel while a game with one runs, plain grey otherwise.
+ * The main screen keeps the controller: this window never takes key focus, it only gets touches.
+ * It lives exactly as long as the activity on the main screen is visible (see SecondScreen).
  */
 final class SecondScreenPanel extends Presentation
 {
     private static final String TAG = "SecondScreenPanel";
+    /** The second screen when there's nothing to show on it. */
+    public static final int GREY = 0xFF808080;
 
-    private final Expansion mExpansion;
+    @Nullable private final Expansion mExpansion;
     private final Runnable mOpenMenu, mSaveAndQuit;
 
-    private SecondScreenPanel(@NonNull Context outer, @NonNull Display display, @NonNull Expansion expansion,
+    private SecondScreenPanel(@NonNull Context outer, @NonNull Display display, @Nullable Expansion expansion,
                               Runnable openMenu, Runnable saveAndQuit)
     {
         super(outer, display);
@@ -66,19 +70,24 @@ final class SecondScreenPanel extends Presentation
         return fallback;
     }
 
-    /** Show the expansion on the second screen. Returns null when there's no second screen. */
+    /**
+     * Show the expansion (or plain grey when it's null) on the second screen.
+     * Returns null when there's no second screen.
+     */
     @Nullable
-    static SecondScreenPanel show(@NonNull Activity activity, @NonNull Expansion expansion,
+    static SecondScreenPanel show(@NonNull Activity activity, @Nullable Expansion expansion,
                                   Runnable openMenu, Runnable saveAndQuit)
     {
         Display display = findSecondDisplay(activity);
         if (display == null) return null;
+        // The app itself was opened on that screen: don't cover it
+        if (display.getDisplayId() == activity.getWindowManager().getDefaultDisplay().getDisplayId()) return null;
         try {
             SecondScreenPanel panel = new SecondScreenPanel(activity, display, expansion, openMenu, saveAndQuit);
             panel.show();
             return panel;
         } catch (WindowManager.InvalidDisplayException | IllegalStateException e) {
-            Log.w(TAG, "Couldn't show the expansion on the second screen", e);
+            Log.w(TAG, "Couldn't show the second screen", e);
             return null;
         }
     }
@@ -94,6 +103,12 @@ final class SecondScreenPanel extends Presentation
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         setCancelable(false);
-        setContentView(new ExpansionView(getContext(), mExpansion, mOpenMenu, mSaveAndQuit));
+        if (mExpansion != null) {
+            setContentView(new ExpansionView(getContext(), mExpansion, mOpenMenu, mSaveAndQuit));
+        } else {
+            View grey = new View(getContext());
+            grey.setBackgroundColor(GREY);
+            setContentView(grey);
+        }
     }
 }

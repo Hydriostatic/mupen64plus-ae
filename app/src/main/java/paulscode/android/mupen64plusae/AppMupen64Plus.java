@@ -28,5 +28,9 @@ public class AppMupen64Plus extends MultiDexApplication
     public void onCreate()
     {
         super.onCreate();
+
+        // Second screen (e.g. AYN Thor bottom screen): grey while the app is open on the main
+        // screen, gone when it isn't (Back, Home, switching apps)
+        paulscode.android.mupen64plusae.game.SecondScreen.install(this);
     }
 }

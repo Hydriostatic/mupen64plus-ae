@@ -10,7 +10,25 @@ original. Tocar numa expansão da lista permite removê-la. Ao abrir um jogo, se
 tela e uma expansão que combine com aquela ROM, o painel dela aparece na tela de baixo; o controle
 continua no jogo.
 
-**Atualizações:** ao abrir, o app procura uma versão mais nova nos Releases do GitHub (tags
+**Atualizar uma expansão:** na lista de **Expansions (.exp)**, o botão ⟳ ao lado de cada
+expansão procura uma cópia mais nova no GitHub. Por padrão ele olha os Releases deste repositório
+(`Hydriostatic/mupen64plus-ae`) e usa o release mais novo que tenha um arquivo chamado
+`<id>.exp` (o `id` do manifest). Também serve um nome que comece o id, como `kirby64.exp` para
+o id `kirby64-usa`. Se a versão (`version`) online for mais nova, ou for igual mas o arquivo tiver
+mudado, a expansão é substituída. Se for mais antiga, a sua é mantida. Para buscar em outro
+lugar, use o campo opcional `"update"` no manifest:
+
+- `"update": "github:dono/repositorio"`: os Releases desse repositório (precisa ser público);
+- `"update": "https://…/arquivo.exp"`: baixa direto esse link.
+
+Para publicar uma versão nova, aumente o `version` no manifest e anexe o `.exp` a um release (por
+exemplo um release fixo chamado `expansions`, substituindo o arquivo).
+
+**Tela de baixo:** enquanto o app está aberto na tela de cima, a tela de baixo fica cinza; durante
+um jogo com expansão, ela mostra o painel. Ela segue a tela de cima: Voltar até sair do app,
+Home ou trocar de app fecham a tela de baixo junto, e ela volta quando o app volta.
+
+**Atualizações do app:** ao abrir, o app procura uma versão mais nova nos Releases do GitHub (tags
 `exp-1.0.N`, geradas a cada push no branch `exp`) e oferece instalar. Também dá para procurar
 manualmente em **Check for updates** no menu lateral.
 
@@ -35,6 +53,7 @@ fonts/…              opcional: uma fonte .ttf/.otf
   "game": "Banjo-Tooie (USA)",
   "version": "1.0",
   "author": "Você",
+  "update": "github:Hydriostatic/mupen64plus-ae",
 
   "match": { "header": "BANJO TOOIE", "country": "E" },
 

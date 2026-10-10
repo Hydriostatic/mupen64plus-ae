@@ -676,10 +676,10 @@ public class GameActivity extends AppCompatActivity implements PromptConfirmList
         showSecondScreenPanel();
     }
 
-    /** Show the expansion's panel on the second screen (if there is one, and an expansion). */
+    /** Second screen (if there is one): the expansion's panel, or plain grey without an expansion. */
     private void showSecondScreenPanel()
     {
-        if (mExpansion == null || mSecondScreenPanel != null) return;
+        if (mSecondScreenPanel != null) return;
         mSecondScreenPanel = SecondScreenPanel.show(this, mExpansion,
                 () -> {
                     // "Options" on the panel: the emulator's in-game menu on the main screen

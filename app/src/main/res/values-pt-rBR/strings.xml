@@ -404,6 +404,12 @@
     <string name="expansions_importFailed">Não é uma expansão válida: %1$s</string>
     <string name="expansions_removed">Expansão removida: %1$s</string>
     <string name="expansions_noPicker">Nenhum seletor de arquivos encontrado.</string>
+    <string name="expansions_update">Atualizar pelo GitHub</string>
+    <string name="expansions_updated">%1$s atualizada para v%2$s</string>
+    <string name="expansions_upToDate">%1$s já está atualizada (v%2$s)</string>
+    <string name="expansions_remoteOlder">A cópia no GitHub (v%1$s) é mais antiga que a sua (v%2$s); a sua foi mantida.</string>
+    <string name="expansions_notFound">Nenhum %1$s.exp encontrado nos releases do GitHub.</string>
+    <string name="expansions_updateFailed">Não deu para atualizar: %1$s</string>
     <string name="update_title">Atualização</string>
     <string name="update_checking">Procurando atualizações…</string>
     <string name="update_available">A versão %1$s está disponível (você tem a %2$s).</string>
