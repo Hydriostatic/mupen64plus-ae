@@ -11,8 +11,9 @@ tela e uma expansão que combine com aquela ROM, o painel dela aparece na tela d
 continua no jogo.
 
 **Atualizar uma expansão:** na lista de **Expansions (.exp)**, o botão ⟳ ao lado de cada
-expansão procura uma cópia mais nova no GitHub. Por padrão ele olha os Releases deste repositório
-(`Hydriostatic/mupen64plus-ae`) e usa o release mais novo que tenha um arquivo chamado
+expansão procura uma cópia mais nova no GitHub. Por padrão ele olha os Releases do repositório
+de expansões [`Hydriostatic/m64ds-expansions`](https://github.com/Hydriostatic/m64ds-expansions)
+(e, se não achar, os deste repositório) e usa o release mais novo que tenha um arquivo chamado
 `<id>.exp` (o `id` do manifest). Também serve um nome que comece o id, como `kirby64.exp` para
 o id `kirby64-usa`. Se a versão (`version`) online for mais nova, ou for igual mas o arquivo tiver
 mudado, a expansão é substituída. Se for mais antiga, a sua é mantida. Para buscar em outro
@@ -53,7 +54,7 @@ fonts/…              opcional: uma fonte .ttf/.otf
   "game": "Banjo-Tooie (USA)",
   "version": "1.0",
   "author": "Você",
-  "update": "github:Hydriostatic/mupen64plus-ae",
+  "update": "github:Hydriostatic/m64ds-expansions",
 
   "match": { "header": "BANJO TOOIE", "country": "E" },
 

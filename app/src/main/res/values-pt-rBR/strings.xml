@@ -408,7 +408,7 @@
     <string name="expansions_updated">%1$s atualizada para v%2$s</string>
     <string name="expansions_upToDate">%1$s já está atualizada (v%2$s)</string>
     <string name="expansions_remoteOlder">A cópia no GitHub (v%1$s) é mais antiga que a sua (v%2$s); a sua foi mantida.</string>
-    <string name="expansions_notFound">Nenhum %1$s.exp encontrado nos releases do GitHub.</string>
+    <string name="expansions_notFound">Nenhum %1$s.exp encontrado nos releases do m64ds-expansions.</string>
     <string name="expansions_updateFailed">Não deu para atualizar: %1$s</string>
     <string name="update_title">Atualização</string>
     <string name="update_checking">Procurando atualizações…</string>

@@ -49,7 +49,7 @@ import paulscode.android.mupen64plusae.Updater;
  * if there is one, replaces the installed file.
  *
  * Where it looks (manifest "update"):
- *  - nothing: the releases of this app's repository (Updater.REPO);
+ *  - nothing: the releases of the expansions repository (EXPANSIONS_REPO), then this app's (Updater.REPO);
  *  - "github:owner/repo" (or "owner/repo", or a github.com/owner/repo link): that repository's releases;
  *  - any other https link: that file, downloaded directly.
  * In releases, the newest release with an asset named &lt;id&gt;.exp is used (also accepted: a name
@@ -59,6 +59,8 @@ public final class ExpansionUpdater
 {
     private static final String TAG = "ExpansionUpdater";
     private static final long MAX_SIZE = 32L * 1024 * 1024;
+    /** Where expansions are published, looked at first when the manifest doesn't say. */
+    public static final String EXPANSIONS_REPO = "Hydriostatic/m64ds-expansions";
     private static final Pattern GITHUB_REPO =
             Pattern.compile("^(?:github:|https?://github\\.com/)?([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\\.git)?/?$");
 
@@ -124,18 +126,20 @@ public final class ExpansionUpdater
     @Nullable
     private static String findUrl(@NonNull String id, @NonNull String source) throws Exception
     {
-        String repo = Updater.REPO;
-        if (!source.isEmpty()) {
-            Matcher m = GITHUB_REPO.matcher(source);
-            if (m.matches()) {
-                repo = m.group(1) + "/" + m.group(2);
-            } else if (source.startsWith("https://") || source.startsWith("http://")) {
-                return source; // a direct link to the file
-            } else {
-                throw new IOException("unknown update source: " + source);
-            }
+        if (source.isEmpty()) {
+            // Default: the expansions repository first, then this app's own
+            String url = findInReleases(id, EXPANSIONS_REPO);
+            return url != null ? url : findInReleases(id, Updater.REPO);
         }
+        Matcher m = GITHUB_REPO.matcher(source);
+        if (m.matches()) return findInReleases(id, m.group(1) + "/" + m.group(2));
+        if (source.startsWith("https://") || source.startsWith("http://")) return source; // a direct link
+        throw new IOException("unknown update source: " + source);
+    }
 
+    @Nullable
+    private static String findInReleases(@NonNull String id, @NonNull String repo) throws Exception
+    {
         HttpURLConnection c = open("https://api.github.com/repos/" + repo + "/releases?per_page=100");
         String body;
         try {
